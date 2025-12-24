@@ -1,0 +1,175 @@
+from flask import Flask, request, jsonify, send_file
+from flask_cors import CORS
+import os
+from dotenv import load_dotenv
+import json
+from datetime import datetime
+import io
+
+from services.llm_service import LLMService
+from services.excel_service import ExcelService
+from services.strava_service import StravaService
+
+load_dotenv()
+
+app = Flask(__name__)
+CORS(app)
+
+# Initialize services
+llm_service = LLMService()
+excel_service = ExcelService()
+strava_service = StravaService()
+
+# In-memory storage (for MVP)
+workout_plans = {}
+imported_activities = []
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({"status": "ok", "message": "Workout Coach API is running"})
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """Handle chat messages and generate workout plans"""
+    try:
+        data = request.json
+        user_message = data.get('message', '')
+        
+        if not user_message:
+            return jsonify({"error": "Message is required"}), 400
+        
+        # Generate workout plan using LLM
+        workout_plan = llm_service.generate_workout_plan(user_message)
+        
+        # Store the plan
+        plan_id = f"plan_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        workout_plans[plan_id] = workout_plan
+        
+        return jsonify({
+            "plan_id": plan_id,
+            "workout_plan": workout_plan,
+            "message": "Workout plan generated successfully"
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/workout-plan/<plan_id>', methods=['GET'])
+def get_workout_plan(plan_id):
+    """Retrieve a specific workout plan"""
+    if plan_id not in workout_plans:
+        return jsonify({"error": "Workout plan not found"}), 404
+    
+    return jsonify({
+        "plan_id": plan_id,
+        "workout_plan": workout_plans[plan_id]
+    })
+
+@app.route('/api/export/excel/<plan_id>', methods=['GET'])
+def export_excel(plan_id):
+    """Export workout plan to Excel"""
+    try:
+        if plan_id not in workout_plans:
+            return jsonify({"error": "Workout plan not found"}), 404
+        
+        workout_plan = workout_plans[plan_id]
+        excel_file = excel_service.create_workout_plan_excel(workout_plan)
+        
+        return send_file(
+            excel_file,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'workout_plan_{plan_id}.xlsx'
+        )
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/strava/auth', methods=['GET'])
+def strava_auth():
+    """Initiate Strava OAuth flow"""
+    auth_url = strava_service.get_authorization_url()
+    return jsonify({"auth_url": auth_url})
+
+@app.route('/api/strava/callback', methods=['GET'])
+def strava_callback():
+    """Handle Strava OAuth callback"""
+    try:
+        code = request.args.get('code')
+        error = request.args.get('error')
+        
+        if error:
+            return jsonify({"error": f"Strava authorization error: {error}"}), 400
+        
+        if not code:
+            return jsonify({"error": "Authorization code not provided"}), 400
+        
+        # Exchange code for access token
+        access_token = strava_service.exchange_code_for_token(code)
+        
+        # Redirect to frontend with token (for MVP simplicity)
+        # In production, use secure session management
+        return f"""
+        <html>
+            <body>
+                <h2>Successfully authenticated with Strava!</h2>
+                <p>You can close this window and return to the app.</p>
+                <script>
+                    // Pass token to parent window if in iframe, otherwise store in localStorage
+                    if (window.opener) {{
+                        window.opener.postMessage({{type: 'strava_token', token: '{access_token}'}}, '*');
+                        window.close();
+                    }} else {{
+                        localStorage.setItem('strava_access_token', '{access_token}');
+                        window.location.href = 'http://localhost:3000?strava_connected=true';
+                    }}
+                </script>
+            </body>
+        </html>
+        """
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/strava/activities', methods=['GET'])
+def get_strava_activities():
+    """Fetch user activities from Strava"""
+    try:
+        access_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if not access_token:
+            return jsonify({"error": "Access token required"}), 401
+        
+        activities = strava_service.get_activities(access_token)
+        imported_activities.extend(activities)
+        
+        return jsonify({
+            "activities": activities,
+            "count": len(activities)
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/strava/import', methods=['POST'])
+def import_strava_activities():
+    """Import selected activities"""
+    try:
+        data = request.json
+        activity_ids = data.get('activity_ids', [])
+        
+        # In a real app, you'd fetch these from Strava and store them
+        imported = [act for act in imported_activities if act.get('id') in activity_ids]
+        
+        return jsonify({
+            "message": f"Imported {len(imported)} activities",
+            "activities": imported
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
+

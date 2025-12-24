@@ -1,0 +1,153 @@
+.strava-import {
+  max-width: 100%;
+}
+
+.strava-import h2 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.description {
+  color: #666;
+  margin-bottom: 30px;
+  line-height: 1.6;
+}
+
+.auth-section,
+.authenticated-section {
+  text-align: center;
+  padding: 30px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.auth-button,
+.fetch-button {
+  padding: 12px 24px;
+  background: #fc4c02;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background 0.3s;
+}
+
+.auth-button:hover:not(:disabled),
+.fetch-button:hover:not(:disabled) {
+  background: #e04402;
+}
+
+.auth-button:disabled,
+.fetch-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.info-text {
+  margin-top: 15px;
+  color: #666;
+  font-style: italic;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #4caf50;
+  color: white;
+  border-radius: 20px;
+  margin-bottom: 15px;
+  font-weight: 500;
+}
+
+.error-message {
+  padding: 15px;
+  background: #ffebee;
+  color: #c62828;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #c62828;
+}
+
+.activities-section {
+  margin-top: 30px;
+}
+
+.activities-section h3 {
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.activities-table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.activities-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.activities-table thead {
+  background: #667eea;
+  color: white;
+}
+
+.activities-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.activities-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.9rem;
+}
+
+.activities-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.activities-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.activity-name {
+  font-weight: 500;
+  color: #333;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  background: #f9f9f9;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+  .activities-table-container {
+    font-size: 0.85rem;
+  }
+
+  .activities-table th,
+  .activities-table td {
+    padding: 8px;
+  }
+
+  .activity-name {
+    max-width: 150px;
+  }
+}
+

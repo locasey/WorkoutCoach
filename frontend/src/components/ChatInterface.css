@@ -1,0 +1,231 @@
+.chat-interface {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  min-height: 300px;
+  max-height: 500px;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.welcome-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.welcome-message h2 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.welcome-message ul {
+  text-align: left;
+  display: inline-block;
+  margin-top: 15px;
+}
+
+.welcome-message li {
+  margin: 8px 0;
+  padding-left: 5px;
+}
+
+.message {
+  margin-bottom: 15px;
+  display: flex;
+}
+
+.message.user {
+  justify-content: flex-end;
+}
+
+.message.assistant {
+  justify-content: flex-start;
+}
+
+.message-content {
+  max-width: 70%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  word-wrap: break-word;
+}
+
+.message.user .message-content {
+  background: #667eea;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.message.assistant .message-content {
+  background: white;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-bottom-left-radius: 4px;
+}
+
+.loading {
+  font-style: italic;
+  color: #666;
+}
+
+.workout-plan-preview {
+  margin-top: 20px;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 2px solid #667eea;
+}
+
+.workout-plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.workout-plan-header h3 {
+  color: #333;
+  margin: 0;
+}
+
+.export-button {
+  padding: 8px 16px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.3s;
+}
+
+.export-button:hover {
+  background: #5568d3;
+}
+
+.plan-info {
+  margin-bottom: 15px;
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
+}
+
+.plan-info p {
+  margin: 5px 0;
+  color: #555;
+}
+
+.workouts-list h4 {
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.workouts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.workout-card {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.workout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.week-badge {
+  background: #667eea;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.type-badge {
+  background: #f0f0f0;
+  color: #666;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  text-transform: capitalize;
+}
+
+.workout-details p {
+  margin: 5px 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.workout-details .notes {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+  font-style: italic;
+  font-size: 0.85rem;
+  color: #777;
+}
+
+.more-workouts {
+  text-align: center;
+  margin-top: 15px;
+  color: #666;
+  font-style: italic;
+}
+
+.chat-input-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.chat-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.chat-input:focus {
+  border-color: #667eea;
+}
+
+.send-button {
+  padding: 12px 24px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: background 0.3s;
+}
+
+.send-button:hover:not(:disabled) {
+  background: #5568d3;
+}
+
+.send-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+

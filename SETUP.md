@@ -87,13 +87,30 @@ node --version
 
 ### Step 4: Getting API Keys
 
-#### OpenAI API Key
+#### LLM API Configuration
 
-1. Go to https://platform.openai.com/
+The app supports both Gemini (default, free) and OpenAI. Configure in your `.env` file:
+
+**Option 1: Gemini (Default, Free)**
+1. Go to https://makersuite.google.com/app/apikey or https://aistudio.google.com/app/apikey
+2. Sign in with your Google account
+3. Click "Create API Key" or "Get API Key"
+4. Copy the API key
+5. In `.env` file:
+   ```env
+   LLM_PROVIDER=gemini
+   GEMINI_API_KEY=your_gemini_api_key_here
+   ```
+
+**Option 2: OpenAI (Optional)**
+1. Go to https://platform.openai.com/api-keys
 2. Sign up or log in
-3. Navigate to API Keys section
-4. Create a new secret key
-5. Copy the key and add it to your `.env` file
+3. Create a new secret key
+4. In `.env` file:
+   ```env
+   LLM_PROVIDER=openai
+   OPENAI_API_KEY=your_openai_api_key_here
+   ```
 
 #### Strava API Credentials
 
@@ -176,9 +193,12 @@ You should see the Workout Coach interface!
 - Make sure virtual environment is activated
 - Run `pip install -r requirements.txt` again
 
-**OpenAI API errors:**
+**LLM API errors:**
 - Verify your API key is correct in `.env`
-- Check your OpenAI account has credits
+- Check `LLM_PROVIDER` is set to either 'gemini' or 'openai'
+- For Gemini: Make sure `GEMINI_API_KEY` is set
+- For OpenAI: Make sure `OPENAI_API_KEY` is set
+- Verify the API key is active in the respective provider's dashboard
 
 ### Frontend Issues
 

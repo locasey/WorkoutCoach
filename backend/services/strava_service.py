@@ -42,7 +42,8 @@ class StravaService:
         response.raise_for_status()
         
         token_data = response.json()
-        return token_data.get('access_token')
+        # Return full token data for validation
+        return token_data
     
     def get_activities(self, access_token, per_page=30):
         """
@@ -82,4 +83,30 @@ class StravaService:
             formatted_activities.append(formatted_activity)
         
         return formatted_activities
+    
+    def get_athlete_info(self, access_token):
+        """
+        Get athlete information to validate the connection.
+        Returns athlete profile data.
+        """
+        url = f"{self.api_url}/athlete"
+        
+        headers = {
+            'Authorization': f'Bearer {access_token}'
+        }
+        
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        
+        athlete = response.json()
+        return {
+            'id': athlete.get('id'),
+            'username': athlete.get('username'),
+            'firstname': athlete.get('firstname'),
+            'lastname': athlete.get('lastname'),
+            'city': athlete.get('city'),
+            'state': athlete.get('state'),
+            'country': athlete.get('country'),
+            'created_at': athlete.get('created_at')
+        }
 

@@ -100,13 +100,32 @@ def strava_callback():
         error = request.args.get('error')
         
         if error:
+            print(f"❌ Strava OAuth Error: {error}")
             return jsonify({"error": f"Strava authorization error: {error}"}), 400
         
         if not code:
+            print("❌ Strava OAuth: No authorization code provided")
             return jsonify({"error": "Authorization code not provided"}), 400
         
+        print(f"✅ Strava OAuth: Received authorization code, exchanging for token...")
+        
         # Exchange code for access token
-        access_token = strava_service.exchange_code_for_token(code)
+        token_data = strava_service.exchange_code_for_token(code)
+        access_token = token_data.get('access_token') if isinstance(token_data, dict) else token_data
+        
+        if not access_token:
+            print("❌ Strava OAuth: Failed to get access token")
+            return jsonify({"error": "Failed to obtain access token"}), 500
+        
+        print(f"✅ Strava OAuth: Successfully obtained access token (expires in {token_data.get('expires_in', 'N/A')} seconds)")
+        
+        # Validate the token by fetching athlete info
+        try:
+            athlete_info = strava_service.get_athlete_info(access_token)
+            print(f"✅ Strava Connection Validated: Connected as {athlete_info.get('firstname', '')} {athlete_info.get('lastname', '')} (ID: {athlete_info.get('id', 'N/A')})")
+        except Exception as validation_error:
+            print(f"⚠️  Strava Token Validation Warning: {str(validation_error)}")
+            # Continue anyway - token might still work for activities
         
         # Redirect to frontend with token (for MVP simplicity)
         # In production, use secure session management
@@ -130,7 +149,33 @@ def strava_callback():
         """
     
     except Exception as e:
+        print(f"❌ Strava OAuth Exception: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/strava/validate', methods=['GET'])
+def validate_strava_connection():
+    """Validate Strava connection and return athlete info"""
+    try:
+        access_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if not access_token:
+            return jsonify({"error": "Access token required"}), 401
+        
+        athlete_info = strava_service.get_athlete_info(access_token)
+        print(f"✅ Strava Validation: Valid connection for athlete ID {athlete_info.get('id', 'N/A')}")
+        
+        return jsonify({
+            "valid": True,
+            "athlete": athlete_info,
+            "message": "Strava connection is valid"
+        })
+    
+    except Exception as e:
+        print(f"❌ Strava Validation Error: {str(e)}")
+        return jsonify({
+            "valid": False,
+            "error": str(e),
+            "message": "Strava connection validation failed"
+        }), 401
 
 @app.route('/api/strava/activities', methods=['GET'])
 def get_strava_activities():
@@ -140,8 +185,11 @@ def get_strava_activities():
         if not access_token:
             return jsonify({"error": "Access token required"}), 401
         
+        print(f"📊 Fetching Strava activities...")
         activities = strava_service.get_activities(access_token)
         imported_activities.extend(activities)
+        
+        print(f"✅ Successfully fetched {len(activities)} activities from Strava")
         
         return jsonify({
             "activities": activities,
@@ -149,6 +197,7 @@ def get_strava_activities():
         })
     
     except Exception as e:
+        print(f"❌ Error fetching Strava activities: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/strava/import', methods=['POST'])

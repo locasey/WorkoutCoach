@@ -9,6 +9,8 @@ import io
 from services.llm_service import LLMService
 from services.excel_service import ExcelService
 from services.strava_service import StravaService
+from services.workout_plan_service import WorkoutPlanService
+from database import get_db, init_db
 
 load_dotenv()
 
@@ -20,9 +22,18 @@ llm_service = LLMService()
 excel_service = ExcelService()
 strava_service = StravaService()
 
-# In-memory storage (for MVP)
+# In-memory storage (for backward compatibility - will be removed)
 workout_plans = {}
 imported_activities = []
+
+# Initialize database on startup
+with app.app_context():
+    try:
+        init_db()
+        print("✅ Database tables initialized")
+    except Exception as e:
+        print(f"⚠️  Database initialization warning: {str(e)}")
+        print("   Make sure PostgreSQL is running and DATABASE_URL is set correctly")
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -40,19 +51,31 @@ def chat():
             return jsonify({"error": "Message is required"}), 400
         
         # Generate workout plan using LLM
-        workout_plan = llm_service.generate_workout_plan(user_message)
+        workout_plan_data = llm_service.generate_workout_plan(user_message)
         
-        # Store the plan
-        plan_id = f"plan_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        workout_plans[plan_id] = workout_plan
-        
-        return jsonify({
-            "plan_id": plan_id,
-            "workout_plan": workout_plan,
-            "message": "Workout plan generated successfully"
-        })
+        # Save to database
+        db = next(get_db())
+        try:
+            workout_plan = WorkoutPlanService.create_workout_plan(
+                db=db,
+                plan_data=workout_plan_data,
+                user_id=None  # Single user for MVP
+            )
+            
+            # Convert to dict for response
+            plan_dict = workout_plan.to_dict()
+            plan_dict['workouts'] = [w.to_dict() for w in workout_plan.workouts]
+            
+            return jsonify({
+                "plan_id": str(workout_plan.id),
+                "workout_plan": plan_dict,
+                "message": "Workout plan generated and saved successfully"
+            })
+        finally:
+            db.close()
     
     except Exception as e:
+        print(f"❌ Error in chat endpoint: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/workout-plan/<plan_id>', methods=['GET'])

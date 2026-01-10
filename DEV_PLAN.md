@@ -16,6 +16,14 @@ This document tracks planned improvements, technical debt, and future features f
   - Implement secret rotation capabilities
   - Add audit logging for secret access
 
+### Gemini API Package Migration
+- [ ] **Priority: Medium** - Migrate from deprecated `google.generativeai` to `google.genai`
+  - Update `backend/services/llm_service.py` to use new `google.genai` package
+  - Update `backend/requirements.txt` to use `google-genai` instead of `google-generativeai`
+  - Test all Gemini functionality after migration
+  - Update documentation with new package name
+  - Note: `google.generativeai` package support has ended and will no longer receive updates
+
 ### Authentication & Authorization
 - [ ] Add user authentication system
 - [ ] Implement role-based access control (if needed)
@@ -137,6 +145,10 @@ This document tracks planned improvements, technical debt, and future features f
 - [ ] Add pre-commit hooks
 - [ ] Code review process
 - [ ] Documentation generation
+- [ ] Dependency maintenance and updates
+  - Regular dependency audits
+  - Migrate deprecated packages (e.g., `google.generativeai` → `google.genai`)
+  - Security vulnerability scanning
 
 ## 📱 Platform Expansion
 

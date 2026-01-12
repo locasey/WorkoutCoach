@@ -1,8 +1,10 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from datetime import datetime, date, timedelta
+from typing import Tuple
 import sys
 import os
+import calendar
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.workout_plan import WorkoutPlan
 from models.workout import Workout
@@ -11,6 +13,61 @@ import uuid
 
 class WorkoutPlanService:
     """Service for managing workout plans and workouts in the database"""
+    
+    @staticmethod
+    def get_week_start_end(target_date: date = None) -> Tuple[date, date]:
+        """
+        Get the start (Monday) and end (Sunday) dates for a calendar week.
+        
+        Args:
+            target_date: Date within the week (defaults to today)
+            
+        Returns:
+            Tuple of (week_start, week_end) dates
+        """
+        if target_date is None:
+            target_date = date.today()
+        
+        # Get Monday of the week (weekday() returns 0=Monday, 6=Sunday)
+        days_since_monday = target_date.weekday()
+        week_start = target_date - timedelta(days=days_since_monday)
+        week_end = week_start + timedelta(days=6)
+        
+        return week_start, week_end
+    
+    @staticmethod
+    def get_week_by_offset(week_offset: int = 0) -> Tuple[date, date]:
+        """
+        Get week start/end dates by offset from current week.
+        
+        Args:
+            week_offset: 0=current week, -1=last week, +1=next week, etc.
+            
+        Returns:
+            Tuple of (week_start, week_end) dates
+        """
+        today = date.today()
+        target_date = today + timedelta(weeks=week_offset)
+        return WorkoutPlanService.get_week_start_end(target_date)
+    
+    @staticmethod
+    def get_month_start_end(year: int, month: int) -> Tuple[date, date]:
+        """
+        Get the start and end dates for a calendar month.
+        
+        Args:
+            year: Year (e.g., 2024)
+            month: Month (1-12)
+            
+        Returns:
+            Tuple of (month_start, month_end) dates
+        """
+        month_start = date(year, month, 1)
+        # Get last day of month
+        last_day = calendar.monthrange(year, month)[1]
+        month_end = date(year, month, last_day)
+        
+        return month_start, month_end
     
     @staticmethod
     def create_workout_plan(db: Session, plan_data: dict, user_id: int = None) -> WorkoutPlan:
@@ -152,7 +209,7 @@ class WorkoutPlanService:
             week_start: Start date of the week (Monday)
             week_end: End date of the week (Sunday)
             user_id: Optional user ID filter
-        
+            
         Returns:
             List of Workout objects
         """
@@ -168,6 +225,74 @@ class WorkoutPlanService:
             query = query.filter(WorkoutPlan.user_id == user_id)
         
         return query.order_by(Workout.scheduled_date, Workout.day).all()
+    
+    @staticmethod
+    def get_workouts_for_month(db: Session, year: int, month: int, user_id: int = None) -> list[Workout]:
+        """
+        Get workouts for a specific calendar month.
+        
+        Args:
+            db: Database session
+            year: Year (e.g., 2024)
+            month: Month (1-12)
+            user_id: Optional user ID filter
+            
+        Returns:
+            List of Workout objects
+        """
+        month_start, month_end = WorkoutPlanService.get_month_start_end(year, month)
+        
+        query = db.query(Workout).join(WorkoutPlan).filter(
+            and_(
+                Workout.scheduled_date >= month_start,
+                Workout.scheduled_date <= month_end,
+                WorkoutPlan.is_active == True
+            )
+        )
+        
+        if user_id is not None:
+            query = query.filter(WorkoutPlan.user_id == user_id)
+        
+        return query.order_by(Workout.scheduled_date, Workout.day).all()
+    
+    @staticmethod
+    def get_week_progress(db: Session, week_start: date, week_end: date, user_id: int = None) -> dict:
+        """
+        Get progress summary for a specific week.
+        
+        Args:
+            db: Database session
+            week_start: Start date of the week (Monday)
+            week_end: End date of the week (Sunday)
+            user_id: Optional user ID filter
+            
+        Returns:
+            Dictionary with progress statistics
+        """
+        workouts = WorkoutPlanService.get_workouts_for_week(db, week_start, week_end, user_id)
+        
+        total_workouts = len(workouts)
+        completed_workouts = sum(1 for w in workouts if w.is_completed)
+        completion_percentage = (completed_workouts / total_workouts * 100) if total_workouts > 0 else 0
+        
+        # Group by day
+        workouts_by_day = {}
+        for workout in workouts:
+            day_key = workout.scheduled_date.isoformat() if workout.scheduled_date else None
+            if day_key:
+                if day_key not in workouts_by_day:
+                    workouts_by_day[day_key] = []
+                workouts_by_day[day_key].append(workout.to_dict())
+        
+        return {
+            'week_start': week_start.isoformat(),
+            'week_end': week_end.isoformat(),
+            'total_workouts': total_workouts,
+            'completed_workouts': completed_workouts,
+            'incomplete_workouts': total_workouts - completed_workouts,
+            'completion_percentage': round(completion_percentage, 1),
+            'workouts_by_day': workouts_by_day
+        }
     
     @staticmethod
     def get_workout(db: Session, workout_id: uuid.UUID) -> Workout:
@@ -191,4 +316,184 @@ class WorkoutPlanService:
         db.refresh(workout)
         
         return workout
+    
+    @staticmethod
+    def _validate_workout_type(workout_type: str) -> bool:
+        """Validate workout type"""
+        valid_types = [
+            'long_run', 'tempo', 'intervals', 'easy_run', 'rest', 
+            'cross_training', 'recovery', 'fartlek', 'hill_repeats'
+        ]
+        return workout_type.lower() in valid_types
+    
+    @staticmethod
+    def _validate_workout_data(update_data: dict) -> dict:
+        """
+        Validate workout update data.
+        
+        Args:
+            update_data: Dictionary with fields to update
+            
+        Returns:
+            Dictionary with validation errors (empty if valid)
+        """
+        errors = {}
+        
+        # Validate type
+        if 'type' in update_data:
+            workout_type = update_data['type']
+            if not isinstance(workout_type, str) or not workout_type.strip():
+                errors['type'] = "Workout type must be a non-empty string"
+            elif not WorkoutPlanService._validate_workout_type(workout_type):
+                errors['type'] = f"Invalid workout type. Valid types: long_run, tempo, intervals, easy_run, rest, cross_training, recovery, fartlek, hill_repeats"
+        
+        # Validate distance_km
+        if 'distance_km' in update_data:
+            distance = update_data['distance_km']
+            if distance is not None:
+                try:
+                    distance_float = float(distance)
+                    if distance_float < 0:
+                        errors['distance_km'] = "Distance must be non-negative"
+                except (ValueError, TypeError):
+                    errors['distance_km'] = "Distance must be a valid number"
+        
+        # Validate duration_minutes
+        if 'duration_minutes' in update_data:
+            duration = update_data['duration_minutes']
+            if duration is not None:
+                try:
+                    duration_int = int(duration)
+                    if duration_int < 0:
+                        errors['duration_minutes'] = "Duration must be non-negative"
+                except (ValueError, TypeError):
+                    errors['duration_minutes'] = "Duration must be a valid integer"
+        
+        # Validate pace (must be string if provided)
+        if 'pace' in update_data:
+            pace = update_data['pace']
+            if pace is not None and not isinstance(pace, str):
+                errors['pace'] = "Pace must be a string"
+        
+        # Validate notes (must be string if provided)
+        if 'notes' in update_data:
+            notes = update_data['notes']
+            if notes is not None and not isinstance(notes, str):
+                errors['notes'] = "Notes must be a string"
+        
+        return errors
+    
+    @staticmethod
+    def update_workout(db: Session, workout_id: uuid.UUID, update_data: dict) -> Workout:
+        """
+        Update workout details. Only updates fields provided in update_data.
+        
+        Args:
+            db: Database session
+            workout_id: ID of workout to update
+            update_data: Dictionary with fields to update (partial updates supported)
+            
+        Returns:
+            Updated Workout object
+            
+        Raises:
+            ValueError: If workout not found or validation fails
+        """
+        workout = db.query(Workout).filter(Workout.id == workout_id).first()
+        if not workout:
+            raise ValueError(f"Workout with id {workout_id} not found")
+        
+        # Validate update data
+        validation_errors = WorkoutPlanService._validate_workout_data(update_data)
+        if validation_errors:
+            error_message = "; ".join([f"{k}: {v}" for k, v in validation_errors.items()])
+            raise ValueError(f"Validation errors: {error_message}")
+        
+        # Update only provided fields (partial update)
+        updatable_fields = ['type', 'distance_km', 'duration_minutes', 'pace', 'notes']
+        
+        for field in updatable_fields:
+            if field in update_data:
+                value = update_data[field]
+                # Handle None values (allow clearing fields)
+                if value is None or (isinstance(value, str) and value.strip() == ''):
+                    setattr(workout, field, None)
+                else:
+                    # Type conversion for numeric fields
+                    if field == 'distance_km':
+                        setattr(workout, field, float(value))
+                    elif field == 'duration_minutes':
+                        setattr(workout, field, int(value))
+                    else:
+                        setattr(workout, field, value)
+        
+        # updated_at is automatically set by SQLAlchemy's onupdate
+        db.commit()
+        db.refresh(workout)
+        
+        return workout
+    
+    @staticmethod
+    def check_plan_limit(db: Session, max_plans: int = 5) -> dict:
+        """
+        Check if the plan limit has been reached.
+        
+        Args:
+            db: Database session
+            max_plans: Maximum number of plans allowed
+            
+        Returns:
+            Dictionary with limit status and existing plans if at limit
+        """
+        current_count = db.query(WorkoutPlan).count()
+        
+        if current_count >= max_plans:
+            existing_plans = WorkoutPlanService.get_all_workout_plans(db)
+            return {
+                "at_limit": True,
+                "current_count": current_count,
+                "max_allowed": max_plans,
+                "existing_plans": [plan.to_dict() for plan in existing_plans]
+            }
+        
+        return {
+            "at_limit": False,
+            "current_count": current_count,
+            "max_allowed": max_plans
+        }
+    
+    @staticmethod
+    def delete_workout_plan(db: Session, plan_id: uuid.UUID, user_id: int = None) -> bool:
+        """
+        Delete a workout plan. Cannot delete active plan.
+        
+        Args:
+            db: Database session
+            plan_id: ID of plan to delete
+            user_id: Optional user ID filter
+            
+        Returns:
+            True if deleted, False if not found
+            
+        Raises:
+            ValueError: If trying to delete active plan
+        """
+        plan = db.query(WorkoutPlan).filter(WorkoutPlan.id == plan_id).first()
+        
+        if not plan:
+            return False
+        
+        # Check user_id if provided
+        if user_id is not None and plan.user_id != user_id:
+            return False
+        
+        # Cannot delete active plan
+        if plan.is_active:
+            raise ValueError("Cannot delete active workout plan. Please deactivate it first.")
+        
+        # Delete plan (workouts will be cascade deleted)
+        db.delete(plan)
+        db.commit()
+        
+        return True
 

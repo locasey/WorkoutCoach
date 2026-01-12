@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import ChatInterface from './components/ChatInterface'
 import StravaImport from './components/StravaImport'
+import { WeekAheadView } from './components/WeekAheadView'
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState('chat')
+  const [activeTab, setActiveTab] = useState('week')
 
   return (
     <div className="app">
@@ -14,6 +15,12 @@ function App() {
       </header>
 
       <nav className="tab-navigation">
+        <button
+          className={activeTab === 'week' ? 'active' : ''}
+          onClick={() => setActiveTab('week')}
+        >
+          📅 Your Week Ahead
+        </button>
         <button
           className={activeTab === 'chat' ? 'active' : ''}
           onClick={() => setActiveTab('chat')}
@@ -29,6 +36,7 @@ function App() {
       </nav>
 
       <main className="app-main">
+        {activeTab === 'week' && <WeekAheadView />}
         {activeTab === 'chat' && <ChatInterface />}
         {activeTab === 'strava' && <StravaImport />}
       </main>

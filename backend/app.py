@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import json
 from datetime import datetime
 import io
+import uuid
 
 from services.llm_service import LLMService
 from services.excel_service import ExcelService
@@ -22,8 +23,7 @@ llm_service = LLMService()
 excel_service = ExcelService()
 strava_service = StravaService()
 
-# In-memory storage (for backward compatibility - will be removed)
-workout_plans = {}
+# Legacy in-memory storage (kept for Strava activities only - will be migrated to DB later)
 imported_activities = []
 
 # Initialize database on startup
@@ -50,12 +50,25 @@ def chat():
         if not user_message:
             return jsonify({"error": "Message is required"}), 400
         
-        # Generate workout plan using LLM
-        workout_plan_data = llm_service.generate_workout_plan(user_message)
-        
-        # Save to database
+        # Check plan limit before creating
         db = next(get_db())
         try:
+            max_plans = int(os.getenv('MAX_WORKOUT_PLANS', 5))
+            limit_check = WorkoutPlanService.check_plan_limit(db, max_plans)
+            
+            if limit_check['at_limit']:
+                return jsonify({
+                    "error": "Maximum workout plans reached",
+                    "message": f"You have reached the limit of {max_plans} workout plans. Please delete an existing plan first.",
+                    "current_count": limit_check['current_count'],
+                    "max_allowed": limit_check['max_allowed'],
+                    "existing_plans": limit_check['existing_plans']
+                }), 400
+            
+            # Generate workout plan using LLM
+            workout_plan_data = llm_service.generate_workout_plan(user_message)
+            
+            # Save to database
             workout_plan = WorkoutPlanService.create_workout_plan(
                 db=db,
                 plan_data=workout_plan_data,
@@ -78,36 +91,334 @@ def chat():
         print(f"❌ Error in chat endpoint: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/workout-plan/<plan_id>', methods=['GET'])
+@app.route('/api/workout-plans', methods=['GET'])
+def get_all_workout_plans():
+    """Get all workout plans"""
+    try:
+        db = next(get_db())
+        try:
+            plans = WorkoutPlanService.get_all_workout_plans(db, user_id=None)
+            max_plans = int(os.getenv('MAX_WORKOUT_PLANS', 5))
+            
+            plans_data = []
+            for plan in plans:
+                plan_dict = plan.to_dict()
+                plan_dict['workout_count'] = len(plan.workouts)
+                plans_data.append(plan_dict)
+            
+            return jsonify({
+                "plans": plans_data,
+                "count": len(plans_data),
+                "max_allowed": max_plans
+            })
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error getting workout plans: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/workout-plans/active', methods=['GET'])
+def get_active_workout_plan():
+    """Get the currently active workout plan"""
+    try:
+        db = next(get_db())
+        try:
+            plan = WorkoutPlanService.get_active_workout_plan(db, user_id=None)
+            
+            if not plan:
+                return jsonify({
+                    "message": "No active workout plan",
+                    "plan": None
+                }), 200
+            
+            plan_dict = plan.to_dict()
+            plan_dict['workouts'] = [w.to_dict() for w in plan.workouts]
+            
+            return jsonify({
+                "plan": plan_dict,
+                "message": "Active workout plan retrieved successfully"
+            })
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error getting active workout plan: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/workout-plans/<plan_id>', methods=['GET'])
 def get_workout_plan(plan_id):
-    """Retrieve a specific workout plan"""
-    if plan_id not in workout_plans:
-        return jsonify({"error": "Workout plan not found"}), 404
-    
-    return jsonify({
-        "plan_id": plan_id,
-        "workout_plan": workout_plans[plan_id]
-    })
+    """Retrieve a specific workout plan by ID"""
+    try:
+        db = next(get_db())
+        try:
+            plan_uuid = uuid.UUID(plan_id)
+            plan = WorkoutPlanService.get_workout_plan(db, plan_uuid)
+            
+            if not plan:
+                return jsonify({"error": "Workout plan not found"}), 404
+            
+            plan_dict = plan.to_dict()
+            plan_dict['workouts'] = [w.to_dict() for w in plan.workouts]
+            
+            return jsonify({
+                "plan": plan_dict,
+                "message": "Workout plan retrieved successfully"
+            })
+        except ValueError as e:
+            return jsonify({"error": f"Invalid plan ID: {str(e)}"}), 400
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error getting workout plan: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/workout-plans/<plan_id>/activate', methods=['POST'])
+def activate_workout_plan(plan_id):
+    """Set a workout plan as active (deactivates all others)"""
+    try:
+        db = next(get_db())
+        try:
+            plan_uuid = uuid.UUID(plan_id)
+            plan = WorkoutPlanService.set_active_workout_plan(db, plan_uuid, user_id=None)
+            
+            plan_dict = plan.to_dict()
+            plan_dict['workouts'] = [w.to_dict() for w in plan.workouts]
+            
+            return jsonify({
+                "plan": plan_dict,
+                "message": "Workout plan activated successfully"
+            })
+        except ValueError as e:
+            if "not found" in str(e).lower():
+                return jsonify({"error": str(e)}), 404
+            return jsonify({"error": f"Invalid plan ID: {str(e)}"}), 400
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error activating workout plan: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/workout-plans/<plan_id>', methods=['DELETE'])
+def delete_workout_plan(plan_id):
+    """Delete a workout plan (cannot delete active plan)"""
+    try:
+        db = next(get_db())
+        try:
+            plan_uuid = uuid.UUID(plan_id)
+            deleted = WorkoutPlanService.delete_workout_plan(db, plan_uuid, user_id=None)
+            
+            if not deleted:
+                return jsonify({"error": "Workout plan not found"}), 404
+            
+            return jsonify({
+                "message": "Workout plan deleted successfully",
+                "deleted_plan_id": plan_id
+            })
+        except ValueError as e:
+            if "active" in str(e).lower():
+                return jsonify({"error": str(e)}), 400
+            return jsonify({"error": f"Invalid plan ID: {str(e)}"}), 400
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error deleting workout plan: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/export/excel/<plan_id>', methods=['GET'])
 def export_excel(plan_id):
     """Export workout plan to Excel"""
     try:
-        if plan_id not in workout_plans:
-            return jsonify({"error": "Workout plan not found"}), 404
-        
-        workout_plan = workout_plans[plan_id]
-        excel_file = excel_service.create_workout_plan_excel(workout_plan)
-        
-        return send_file(
-            excel_file,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'workout_plan_{plan_id}.xlsx'
-        )
+        db = next(get_db())
+        try:
+            plan_uuid = uuid.UUID(plan_id)
+            plan = WorkoutPlanService.get_workout_plan(db, plan_uuid)
+            
+            if not plan:
+                return jsonify({"error": "Workout plan not found"}), 404
+            
+            # Convert to dict format expected by Excel service
+            plan_dict = plan.to_dict()
+            plan_dict['workouts'] = [w.to_dict() for w in plan.workouts]
+            
+            excel_file = excel_service.create_workout_plan_excel(plan_dict)
+            
+            return send_file(
+                excel_file,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                as_attachment=True,
+                download_name=f'workout_plan_{plan_id}.xlsx'
+            )
+        except ValueError as e:
+            return jsonify({"error": f"Invalid plan ID: {str(e)}"}), 400
+        finally:
+            db.close()
     
     except Exception as e:
+        print(f"❌ Error exporting Excel: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+# ============================================================================
+# Phase 3: Week View API Endpoints
+# ============================================================================
+
+@app.route('/api/workouts/week', methods=['GET'])
+def get_workouts_current_week():
+    """Get workouts for the current calendar week"""
+    try:
+        db = next(get_db())
+        try:
+            week_start, week_end = WorkoutPlanService.get_week_start_end()
+            workouts = WorkoutPlanService.get_workouts_for_week(db, week_start, week_end, user_id=None)
+            
+            return jsonify({
+                'week_start': week_start.isoformat(),
+                'week_end': week_end.isoformat(),
+                'workouts': [w.to_dict() for w in workouts],
+                'count': len(workouts)
+            })
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error fetching current week workouts: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/workouts/week/<int:week_offset>', methods=['GET'])
+def get_workouts_week_offset(week_offset):
+    """Get workouts for a specific week by offset (0=current, -1=last, +1=next)"""
+    try:
+        db = next(get_db())
+        try:
+            week_start, week_end = WorkoutPlanService.get_week_by_offset(week_offset)
+            workouts = WorkoutPlanService.get_workouts_for_week(db, week_start, week_end, user_id=None)
+            
+            return jsonify({
+                'week_offset': week_offset,
+                'week_start': week_start.isoformat(),
+                'week_end': week_end.isoformat(),
+                'workouts': [w.to_dict() for w in workouts],
+                'count': len(workouts)
+            })
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error fetching week workouts: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/workouts/month/<int:year>/<int:month>', methods=['GET'])
+def get_workouts_month(year, month):
+    """Get workouts for a specific calendar month"""
+    try:
+        # Validate month
+        if month < 1 or month > 12:
+            return jsonify({"error": "Month must be between 1 and 12"}), 400
+        
+        db = next(get_db())
+        try:
+            workouts = WorkoutPlanService.get_workouts_for_month(db, year, month, user_id=None)
+            
+            return jsonify({
+                'year': year,
+                'month': month,
+                'workouts': [w.to_dict() for w in workouts],
+                'count': len(workouts)
+            })
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error fetching month workouts: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/workouts/<workout_id>/complete', methods=['PUT'])
+def toggle_workout_completion(workout_id):
+    """Toggle workout completion status"""
+    try:
+        db = next(get_db())
+        try:
+            workout = WorkoutPlanService.toggle_workout_completion(db, uuid.UUID(workout_id))
+            return jsonify({
+                'workout': workout.to_dict(),
+                'message': f"Workout marked as {'completed' if workout.is_completed else 'incomplete'}"
+            })
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 404
+        finally:
+            db.close()
+    except ValueError as e:
+        return jsonify({"error": f"Invalid workout ID: {str(e)}"}), 400
+    except Exception as e:
+        print(f"❌ Error toggling workout completion: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/workouts/progress', methods=['GET'])
+def get_week_progress():
+    """Get progress summary for the current week"""
+    try:
+        db = next(get_db())
+        try:
+            # Get current week by default, or allow week_offset query param
+            week_offset = request.args.get('week_offset', type=int, default=0)
+            week_start, week_end = WorkoutPlanService.get_week_by_offset(week_offset)
+            
+            progress = WorkoutPlanService.get_week_progress(db, week_start, week_end, user_id=None)
+            
+            return jsonify(progress)
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error fetching week progress: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================================================
+# Phase 4: Workout Editing API
+# ============================================================================
+
+@app.route('/api/workouts/<workout_id>', methods=['PUT'])
+def update_workout(workout_id):
+    """Update workout details (partial updates supported)"""
+    try:
+        data = request.json
+        if data is None:
+            return jsonify({"error": "Request body is required"}), 400
+        
+        # Allow empty body (no fields to update)
+        if not data:
+            # Just return the workout as-is
+            db = next(get_db())
+            try:
+                workout = WorkoutPlanService.get_workout(db, uuid.UUID(workout_id))
+                if not workout:
+                    return jsonify({"error": f"Workout with id {workout_id} not found"}), 404
+                return jsonify({
+                    'workout': workout.to_dict(),
+                    'message': 'No fields to update'
+                })
+            finally:
+                db.close()
+        
+        db = next(get_db())
+        try:
+            workout = WorkoutPlanService.update_workout(db, uuid.UUID(workout_id), data)
+            return jsonify({
+                'workout': workout.to_dict(),
+                'message': 'Workout updated successfully'
+            })
+        except ValueError as e:
+            error_msg = str(e)
+            if "not found" in error_msg:
+                return jsonify({"error": error_msg}), 404
+            else:
+                # Validation errors
+                return jsonify({"error": error_msg}), 400
+        finally:
+            db.close()
+    except ValueError as e:
+        return jsonify({"error": f"Invalid workout ID: {str(e)}"}), 400
+    except Exception as e:
+        print(f"❌ Error updating workout: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================================================
+# Strava Integration Endpoints
+# ============================================================================
 
 @app.route('/api/strava/auth', methods=['GET'])
 def strava_auth():

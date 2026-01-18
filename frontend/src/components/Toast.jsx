@@ -15,7 +15,7 @@ export function useToast() {
 }
 
 // Individual Toast component
-function Toast({ id, type, message, onDismiss }) {
+function Toast({ id, type, message, action, onDismiss }) {
   const icons = {
     success: <CheckCircle className="toast-icon" size={20} />,
     error: <XCircle className="toast-icon" size={20} />,
@@ -27,6 +27,18 @@ function Toast({ id, type, message, onDismiss }) {
     <div className={`toast toast-${type}`} role="alert" aria-live="polite">
       {icons[type]}
       <span className="toast-message">{message}</span>
+      {action && (
+        <button
+          className="toast-action"
+          onClick={() => {
+            action.onClick();
+            onDismiss(id);
+          }}
+          aria-label={action.label}
+        >
+          {action.label}
+        </button>
+      )}
       <button
         className="toast-dismiss"
         onClick={() => onDismiss(id)}
@@ -50,6 +62,7 @@ function ToastContainer({ toasts, onDismiss }) {
           id={toast.id}
           type={toast.type}
           message={toast.message}
+          action={toast.action}
           onDismiss={onDismiss}
         />
       ))}
@@ -61,10 +74,10 @@ function ToastContainer({ toasts, onDismiss }) {
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = useCallback((message, type = 'info', duration = 5000) => {
+  const addToast = useCallback((message, type = 'info', duration = 5000, action = null) => {
     const id = Date.now() + Math.random();
 
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message, type, action }]);
 
     // Auto-dismiss after duration
     if (duration > 0) {
@@ -82,10 +95,10 @@ export function ToastProvider({ children }) {
 
   // Convenience methods for different toast types
   const toast = useCallback({
-    success: (message, duration) => addToast(message, 'success', duration),
+    success: (message, duration, action) => addToast(message, 'success', duration, action),
     error: (message, duration) => addToast(message, 'error', duration ?? 8000), // Errors stay longer
-    warning: (message, duration) => addToast(message, 'warning', duration),
-    info: (message, duration) => addToast(message, 'info', duration),
+    warning: (message, duration, action) => addToast(message, 'warning', duration, action),
+    info: (message, duration, action) => addToast(message, 'info', duration, action),
   }, [addToast]);
 
   return (

@@ -11,6 +11,21 @@ function ChatInterface() {
   const [planId, setPlanId] = useState(null)
   const toast = useToast()
 
+  const examplePrompts = [
+    "Create a 12-week half marathon training plan",
+    "I need a 8-week 5K training program for beginners",
+    "Generate a 16-week marathon plan with 4 runs per week"
+  ]
+
+  const handleExampleClick = (exampleText) => {
+    setMessage(exampleText)
+    // Focus the input after setting the message
+    setTimeout(() => {
+      const input = document.querySelector('.chat-input')
+      if (input) input.focus()
+    }, 0)
+  }
+
   const handleSend = async (e) => {
     e.preventDefault()
     if (!message.trim() || loading) return
@@ -77,9 +92,23 @@ function ChatInterface() {
             <h2>Welcome to Workout Coach! 🏃</h2>
             <p>Ask me to create a workout plan. For example:</p>
             <ul>
-              <li>"Create a 12-week half marathon training plan"</li>
-              <li>"I need a 8-week 5K training program for beginners"</li>
-              <li>"Generate a 16-week marathon plan with 4 runs per week"</li>
+              {examplePrompts.map((prompt, idx) => (
+                <li 
+                  key={idx}
+                  onClick={() => handleExampleClick(prompt)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleExampleClick(prompt)
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Use example: ${prompt}`}
+                >
+                  {prompt}
+                </li>
+              ))}
             </ul>
           </div>
         )}
@@ -93,7 +122,11 @@ function ChatInterface() {
         {loading && (
           <div className="message assistant">
             <div className="message-content">
-              <span className="loading">Generating your workout plan...</span>
+              <div className="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
             </div>
           </div>
         )}

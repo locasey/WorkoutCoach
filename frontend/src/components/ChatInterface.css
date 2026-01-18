@@ -229,3 +229,67 @@
   cursor: not-allowed;
 }
 
+/* Typing indicator */
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+}
+
+.typing-indicator span {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--persian-blue);
+  border-radius: 50%;
+  animation: typing-bounce 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes typing-bounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  40% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
+}
+
+/* Clickable example prompts */
+.welcome-message li {
+  margin: 8px 0;
+  padding: 12px 16px;
+  padding-left: 16px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  list-style: none;
+}
+
+.welcome-message li:hover {
+  border-color: var(--persian-blue);
+  background: #f8f9ff;
+  transform: translateX(4px);
+}
+
+.welcome-message li:active {
+  transform: translateX(2px);
+}
+
+.welcome-message li:focus-visible {
+  outline: 2px solid var(--persian-blue);
+  outline-offset: 2px;
+}
+

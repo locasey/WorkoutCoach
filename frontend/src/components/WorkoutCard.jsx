@@ -1,8 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, Minus, Edit2, Clock, Gauge, Heart, StickyNote, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 export function WorkoutCard({ workout, onToggle, onEdit, isToday = false }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
+
+  // Track when workout status changes to completed
+  useEffect(() => {
+    if (workout.status === 'completed') {
+      setJustCompleted(true);
+      
+      // Trigger confetti celebration
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.8 },
+        colors: ['#8eb19d', '#072ac8', '#eacdc2']
+      });
+
+      // Reset animation state after it completes
+      const timer = setTimeout(() => setJustCompleted(false), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [workout.status]);
 
   const getStatusIcon = () => {
     if (workout.status === 'completed') {
@@ -75,8 +96,12 @@ export function WorkoutCard({ workout, onToggle, onEdit, isToday = false }) {
       )}
 
       {/* Expanded Details */}
-      {isExpanded && workout.status !== 'rest' && (
-        <div className="mb-4 space-y-2 pb-3 border-b border-[#1e1b18]/10">
+      <div 
+        className={`overflow-hidden transition-all duration-[var(--transition-normal)] ${
+          isExpanded && workout.status !== 'rest' ? 'max-h-96 opacity-100 mb-4' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <div className="space-y-2 pb-3 border-b border-[#1e1b18]/10">
           {workout.duration && (
             <div className="flex items-center gap-2 text-sm text-[#1e1b18]/70">
               <Clock className="w-4 h-4 text-[#072ac8]" />
@@ -119,7 +144,7 @@ export function WorkoutCard({ workout, onToggle, onEdit, isToday = false }) {
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* Status Checkbox - Only show if not empty */}
       {!isEmpty && (
@@ -133,7 +158,7 @@ export function WorkoutCard({ workout, onToggle, onEdit, isToday = false }) {
                 : workout.status === 'rest'
                 ? 'border-[#a44200] bg-[#a44200] cursor-not-allowed'
                 : 'border-[#072ac8] hover:border-[#072ac8]/70'
-            }`}
+            } ${justCompleted ? 'checkmark-pop' : ''}`}
             aria-label={workout.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
           >
             {getStatusIcon()}

@@ -164,6 +164,10 @@ export function WeekAheadView() {
     // Skip placeholder workouts
     if (workoutId.startsWith('placeholder-')) return;
 
+    // Store the previous workout state for undo
+    const previousWorkout = workouts.find(w => w.id === workoutId);
+    if (!previousWorkout) return;
+
     try {
       const response = await axios.put(`${API_BASE_URL}/workouts/${workoutId}/complete`);
       const updatedWorkout = mapWorkoutToDesign(response.data.workout);
@@ -173,9 +177,24 @@ export function WeekAheadView() {
         prevWorkouts.map(w => w.id === workoutId ? updatedWorkout : w)
       );
 
-      // Show feedback
+      // Show feedback with undo option
       const isCompleted = updatedWorkout.status === 'completed';
-      toast.success(isCompleted ? 'Workout marked as complete!' : 'Workout marked as incomplete');
+      
+      if (isCompleted) {
+        toast.success(
+          'Workout marked as complete!',
+          5000,
+          {
+            label: 'Undo',
+            onClick: () => {
+              // Call toggle again to undo
+              toggleWorkoutStatus(workoutId);
+            }
+          }
+        );
+      } else {
+        toast.success('Workout marked as incomplete');
+      }
 
       // Refresh progress
       if (viewMode === 'week') {

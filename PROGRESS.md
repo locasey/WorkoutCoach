@@ -2,37 +2,37 @@
 
 Last Updated: 2026-01-18 by Claude
 
-## Current Sprint: UX Phase 2 - Critical UX Fixes
+## Current Sprint: UX Phase 3 - Interaction Polish
 
 ### Completed
-- [x] Create Toast notification component - Done: 2026-01-18 by Claude
-  - Toast.jsx with context provider and useToast hook
-  - Toast.css with success/error/warning/info variants
-  - Auto-dismiss with configurable duration
-- [x] Replace alert() calls with toast notifications - Done: 2026-01-18 by Claude
-  - ChatInterface: Export success/error
-  - StravaImport: Connect, fetch, disconnect feedback
-  - WeekAheadView: Workout completion toggle
-  - WorkoutEditModal: Save success/error
-- [x] Implement empty states with CTAs - Done: 2026-01-18 by Claude
-  - WeekAheadView and MonthView have "Create Workout Plan" CTAs
-  - Added proper tab navigation IDs for CTA buttons
-- [x] Add keyboard navigation - Done: 2026-01-18 by Claude
-  - Arrow keys for week/month navigation
-  - 'T' key to jump to today
-  - Escape key to close modals
-- [x] Fix mobile responsive issues - Done: 2026-01-18 by Claude
-  - Week view grid now responsive (1->2->4->7 columns)
-  - Larger touch targets (44px min) on mobile
-  - Skeleton loader matches responsive grid
-- [x] Ensure consistent Today indicator - Done: 2026-01-18 by Claude
-  - Both views use persian-blue ring
-  - WorkoutCard shows "Today" badge
-  - MonthView shows blue dot indicator
-- [x] Improve error handling - Done: 2026-01-18 by Claude
-  - Created reusable ErrorAlert component
-  - User-friendly error message mapping
-  - Retry and dismiss buttons
+- [x] Card expansion animations - Done: 2026-01-18 by Claude
+  - WorkoutCard.jsx now uses max-height + opacity transitions
+  - Smooth expand/collapse with CSS transitions using --transition-normal
+- [x] Completion animations with checkmark-pop - Done: 2026-01-18 by Claude
+  - @keyframes checkmark-pop animation added to index.css
+  - Canvas-confetti celebration effect on workout completion
+  - Animation triggers when workout status changes to completed
+- [x] Typing indicator for chat - Done: 2026-01-18 by Claude
+  - Bouncing dots indicator component in ChatInterface
+  - Replaces "Generating your workout plan..." text
+  - CSS animations for typing-bounce effect
+- [x] Clickable welcome examples - Done: 2026-01-18 by Claude
+  - Example prompts in ChatInterface are now interactive
+  - Click or Enter key to fill input with example text
+  - Hover states with transform and border color changes
+- [x] Month view tooltips - Done: 2026-01-18 by Claude
+  - Title attributes show workout type, distance, and status
+  - Appears on hover over workout cells in MonthView
+- [x] Undo toast for completions - Done: 2026-01-18 by Claude
+  - Toast component extended to support action buttons
+  - "Undo" button appears after marking workout complete
+  - WeekAheadView uses toast with undo action
+- [x] Hover states enhancement - Done: 2026-01-18 by Claude
+  - MonthView cells have subtle scale transform on hover
+  - hover:scale-[1.02] applied to workout cells
+- [x] Reduced motion support - Done: 2026-01-18 by Claude
+  - Added @media (prefers-reduced-motion: reduce) to index.css
+  - Respects user accessibility preferences
 
 ### In Progress
 (None - Sprint complete!)

@@ -140,11 +140,12 @@ export function MonthView({ workouts, onToggle, onEdit, onDayClick, currentMonth
                 <div
                   key={index}
                   onClick={() => onDayClick && onDayClick(day.fullDate)}
+                  title={day.workout ? `${day.workout.type}${day.workout.distance ? ` - ${day.workout.distance}` : ''} (${day.workout.status})` : ''}
                   className={`border rounded-lg p-3 min-h-[120px] cursor-pointer transition-all ${
                     day.isCurrentMonth
                       ? 'bg-white border-[#8eb19d]'
                       : 'bg-[#eacdc2]/30 border-[#eacdc2]'
-                  } ${day.workout ? 'hover:shadow-md' : 'hover:bg-[#eacdc2]/20'} ${
+                  } ${day.workout ? 'hover:shadow-md hover:scale-[1.02]' : 'hover:bg-[#eacdc2]/20'} ${
                     isTodayCell ? 'ring-2 ring-persian-blue ring-offset-1' : ''
                   }`}
                 >

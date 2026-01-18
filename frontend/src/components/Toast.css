@@ -87,6 +87,30 @@
   line-height: 1.4;
 }
 
+/* Action button */
+.toast-action {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid currentColor;
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+  white-space: nowrap;
+}
+
+.toast-action:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.toast-action:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
 /* Dismiss button */
 .toast-dismiss {
   flex-shrink: 0;

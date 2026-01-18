@@ -2,9 +2,32 @@
 
 Last Updated: 2026-01-18 by Claude
 
-## Current Sprint: UX Phase 3 - Interaction Polish
+## Current Sprint: UX Phase 4 - Mobile Optimization
 
 ### Completed
+- [x] Install react-swipeable dependency - Done: 2026-01-18 by Claude
+- [x] Swipe gestures for week navigation - Done: 2026-01-18 by Claude
+  - Left swipe goes to next week
+  - Right swipe goes to previous week
+  - Touch-only (no mouse tracking)
+- [x] Activity cards for mobile - Done: 2026-01-18 by Claude
+  - Created ActivityCard.jsx component
+  - Shows cards on mobile (<768px), table on desktop
+  - Stats grid with icons for better readability
+- [x] 3-day mobile week view - Done: 2026-01-18 by Claude
+  - Shows yesterday, today, tomorrow on mobile
+  - Maintains 7-day view on larger screens
+  - Automatically centers on current day
+
+### In Progress
+(None - Sprint complete!)
+
+### Pending
+(None)
+
+## Previous Sprints
+
+### UX Phase 3 - Interaction Polish (Completed 2026-01-18)
 - [x] Card expansion animations - Done: 2026-01-18 by Claude
   - WorkoutCard.jsx now uses max-height + opacity transitions
   - Smooth expand/collapse with CSS transitions using --transition-normal

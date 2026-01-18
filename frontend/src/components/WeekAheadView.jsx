@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useSwipeable } from 'react-swipeable';
 import { WorkoutCard } from './WorkoutCard';
 import { MonthView } from './MonthView';
 import { WorkoutEditModal } from './WorkoutEditModal';
@@ -20,6 +21,7 @@ export function WeekAheadView() {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const toast = useToast();
 
   // Edit modal state
@@ -123,6 +125,16 @@ export function WeekAheadView() {
       fetchMonthWorkouts(currentYear, currentMonth);
     }
   }, [viewMode, weekOffset, currentMonth, currentYear]);
+
+  // Handle window resize for mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Keyboard navigation
   useEffect(() => {
@@ -320,8 +332,43 @@ export function WeekAheadView() {
     return today.getTime() === workoutDate.getTime();
   };
 
+  // Get 3-day view for mobile (yesterday, today, tomorrow)
+  const getMobileWorkouts = () => {
+    if (!workouts.length) return [];
+    
+    // Find today's index
+    const todayIndex = workouts.findIndex(w => isTodayInWeek(w.scheduledDate));
+    
+    if (todayIndex === -1) {
+      // If today is not found, just show first 3 days
+      return workouts.slice(0, 3);
+    }
+    
+    // Show yesterday, today, tomorrow (3 days centered on today)
+    const startIndex = Math.max(0, todayIndex - 1);
+    const endIndex = Math.min(workouts.length, startIndex + 3);
+    
+    return workouts.slice(startIndex, endIndex);
+  };
+
   const weekRange = viewMode === 'week' ? getWeekRange() : null;
   const monthName = new Date(currentYear, currentMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  // Swipe handlers for mobile navigation
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => {
+      if (viewMode === 'week') {
+        handleNext();
+      }
+    },
+    onSwipedRight: () => {
+      if (viewMode === 'week') {
+        handlePrevious();
+      }
+    },
+    trackMouse: false, // Only track touch, not mouse
+    preventScrollOnSwipe: true,
+  });
 
   return (
     <div className="max-w-full mx-auto p-6">
@@ -404,7 +451,7 @@ export function WeekAheadView() {
 
         {/* View Content */}
         {viewMode === 'week' ? (
-          <div className="p-6 overflow-x-auto">
+          <div className="p-6 overflow-x-auto" {...swipeHandlers}>
             {loading && workouts.length === 0 ? (
               <SkeletonWeek />
             ) : workouts.length === 0 || workouts.every(w => !w.type) ? (
@@ -431,7 +478,7 @@ export function WeekAheadView() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                {workouts.map((workout) => (
+                {(isMobile ? getMobileWorkouts() : workouts).map((workout) => (
                   <WorkoutCard
                     key={workout.id}
                     workout={workout}

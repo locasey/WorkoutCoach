@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useToast } from './Toast'
 import { ErrorAlert } from './ErrorAlert'
+import { ActivityCard } from './ActivityCard'
 import './StravaImport.css'
 
 const API_BASE_URL = '/api';
@@ -247,7 +248,21 @@ function StravaImport() {
       {activities.length > 0 && (
         <div className="activities-section">
           <h3>Your Activities ({activities.length})</h3>
-          <div className="activities-table-container">
+          
+          {/* Mobile Card View */}
+          <div className="activities-cards md:hidden">
+            {activities.map((activity) => (
+              <ActivityCard
+                key={activity.id}
+                activity={activity}
+                formatDate={formatDate}
+                formatPace={formatPace}
+              />
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="activities-table-container hidden md:block">
             <table className="activities-table">
               <thead>
                 <tr>

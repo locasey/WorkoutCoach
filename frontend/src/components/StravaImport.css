@@ -124,6 +124,13 @@
   margin-bottom: 15px;
 }
 
+/* Activity Cards - Mobile View */
+.activities-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .activities-table-container {
   overflow-x: auto;
   border-radius: 8px;

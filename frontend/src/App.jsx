@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import ChatInterface from './components/ChatInterface'
 import StravaImport from './components/StravaImport'
 import { WeekAheadView } from './components/WeekAheadView'
+import { PlanManager } from './components/PlanManager/PlanManager'
 import { ToastProvider } from './components/Toast'
 import './App.css'
 
@@ -38,6 +39,16 @@ function App() {
           Generate Workout Plan
         </button>
         <button
+          id="tab-plans"
+          role="tab"
+          aria-selected={activeTab === 'plans'}
+          aria-controls="panel-plans"
+          className={activeTab === 'plans' ? 'active' : ''}
+          onClick={() => setActiveTab('plans')}
+        >
+          My Plans
+        </button>
+        <button
           id="tab-strava"
           role="tab"
           aria-selected={activeTab === 'strava'}
@@ -52,6 +63,7 @@ function App() {
       <main className="app-main" role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
         {activeTab === 'week' && <WeekAheadView />}
         {activeTab === 'chat' && <ChatInterface />}
+        {activeTab === 'plans' && <PlanManager />}
         {activeTab === 'strava' && <StravaImport />}
       </main>
     </div>

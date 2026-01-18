@@ -127,23 +127,24 @@ export function WorkoutCard({ workout, onToggle, onEdit, isToday = false }) {
           <button
             onClick={onToggle}
             disabled={workout.status === 'rest'}
-            className={`w-6 h-6 border-2 rounded flex items-center justify-center transition-colors ${
+            className={`w-8 h-8 sm:w-6 sm:h-6 border-2 rounded flex items-center justify-center transition-colors touch-manipulation ${
               workout.status === 'completed'
                 ? 'border-[#8eb19d] bg-[#8eb19d]'
                 : workout.status === 'rest'
                 ? 'border-[#a44200] bg-[#a44200] cursor-not-allowed'
                 : 'border-[#072ac8] hover:border-[#072ac8]/70'
             }`}
+            aria-label={workout.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
           >
             {getStatusIcon()}
           </button>
 
           <button
             onClick={onEdit}
-            className="p-1.5 text-[#1e1b18]/60 hover:text-[#072ac8] hover:bg-[#eacdc2] rounded transition-colors"
+            className="p-2 sm:p-1.5 text-[#1e1b18]/60 hover:text-[#072ac8] hover:bg-[#eacdc2] rounded transition-colors touch-manipulation min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
             aria-label="Edit workout"
           >
-            <Edit2 className="w-4 h-4" />
+            <Edit2 className="w-5 h-5 sm:w-4 sm:h-4" />
           </button>
         </div>
       )}

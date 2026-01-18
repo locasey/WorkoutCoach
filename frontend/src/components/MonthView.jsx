@@ -111,7 +111,7 @@ export function MonthView({ workouts, onToggle, onEdit, onDayClick, currentMonth
             </p>
             <button
               onClick={() => {
-                const chatTab = document.querySelector('[aria-label="Chat"]');
+                const chatTab = document.getElementById('tab-chat');
                 if (chatTab) chatTab.click();
               }}
               className="inline-flex items-center gap-2 px-6 py-3 bg-persian-blue text-white rounded-lg hover:bg-persian-blue-hover transition-colors font-medium"

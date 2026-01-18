@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
+import { useToast } from './Toast'
+import { ErrorAlert } from './ErrorAlert'
 import './StravaImport.css'
 
 const API_BASE_URL = '/api';
@@ -11,6 +13,7 @@ function StravaImport() {
   const [loading, setLoading] = useState(false)
   const [validating, setValidating] = useState(true)
   const [error, setError] = useState(null)
+  const toast = useToast()
 
   // Get authorization header for API calls
   const getAuthHeader = () => {
@@ -65,6 +68,7 @@ function StravaImport() {
         setSessionToken(newToken);
         setAthlete(athleteData);
         setError(null);
+        toast.success(`Connected to Strava as ${athleteData?.firstname || 'athlete'}!`);
       }
       // Also handle legacy token format for backwards compatibility
       if (event.data.type === 'strava_token') {
@@ -102,7 +106,9 @@ function StravaImport() {
       // Redirect to Strava OAuth
       window.location.href = response.data.auth_url;
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to initiate Strava authentication');
+      const errorMsg = err.response?.data?.error || 'Failed to initiate Strava authentication';
+      setError(errorMsg);
+      toast.error(errorMsg);
       setLoading(false);
     }
   };
@@ -111,6 +117,7 @@ function StravaImport() {
   const handleFetchActivities = async () => {
     if (!sessionToken) {
       setError('Please authenticate with Strava first');
+      toast.warning('Please connect to Strava first');
       return;
     }
 
@@ -120,10 +127,13 @@ function StravaImport() {
       const response = await axios.get(`${API_BASE_URL}/strava/activities`, {
         headers: getAuthHeader()
       });
-      setActivities(response.data.activities || []);
+      const fetchedActivities = response.data.activities || [];
+      setActivities(fetchedActivities);
+      toast.success(`Loaded ${fetchedActivities.length} activities from Strava`);
     } catch (err) {
       const errorMsg = err.response?.data?.error || 'Failed to fetch activities';
       setError(errorMsg);
+      toast.error(errorMsg);
 
       // If session expired, clear it
       if (err.response?.status === 401) {
@@ -140,6 +150,7 @@ function StravaImport() {
       await axios.post(`${API_BASE_URL}/strava/logout`, {}, {
         headers: getAuthHeader()
       });
+      toast.info('Disconnected from Strava');
     } catch (err) {
       console.log('Logout error:', err);
     }
@@ -226,9 +237,11 @@ function StravaImport() {
       )}
 
       {error && (
-        <div className="error-message">
-          {error}
-        </div>
+        <ErrorAlert
+          message={error}
+          onRetry={sessionToken ? handleFetchActivities : handleAuth}
+          onDismiss={() => setError(null)}
+        />
       )}
 
       {activities.length > 0 && (

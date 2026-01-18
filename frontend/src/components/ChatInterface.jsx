@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import axios from 'axios'
+import { useToast } from './Toast'
 import './ChatInterface.css'
 
 function ChatInterface() {
@@ -8,6 +9,7 @@ function ChatInterface() {
   const [loading, setLoading] = useState(false)
   const [workoutPlan, setWorkoutPlan] = useState(null)
   const [planId, setPlanId] = useState(null)
+  const toast = useToast()
 
   const handleSend = async (e) => {
     e.preventDefault()
@@ -60,9 +62,10 @@ function ChatInterface() {
       document.body.appendChild(link)
       link.click()
       link.remove()
+      toast.success('Workout plan exported successfully!')
     } catch (error) {
       console.error('Error exporting Excel:', error)
-      alert('Failed to export Excel file. Please try again.')
+      toast.error('Failed to export Excel file. Please try again.')
     }
   }
 

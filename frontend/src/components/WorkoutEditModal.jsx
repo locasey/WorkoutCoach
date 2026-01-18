@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { X, Save, AlertCircle, Check } from 'lucide-react';
+import { useToast } from './Toast';
 
 const API_BASE_URL = '/api';
 
@@ -29,6 +30,7 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
   const [error, setError] = useState(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const toast = useToast();
 
   // Initialize form data when workout changes
   useEffect(() => {
@@ -59,6 +61,20 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
       setHasChanges(changed);
     }
   }, [formData, workout]);
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        handleClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, hasChanges]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -146,12 +162,14 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
       if (Object.keys(updateData).length > 0) {
         const response = await axios.put(`${API_BASE_URL}/workouts/${workout.id}`, updateData);
         onSave(response.data.workout);
+        toast.success('Workout updated successfully!');
       }
 
       onClose();
     } catch (err) {
       console.error('Error updating workout:', err);
       setError(err.response?.data?.error || 'Failed to update workout');
+      toast.error('Failed to update workout');
     } finally {
       setLoading(false);
     }

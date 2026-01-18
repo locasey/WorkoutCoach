@@ -3,9 +3,11 @@ import axios from 'axios';
 import { WorkoutCard } from './WorkoutCard';
 import { MonthView } from './MonthView';
 import { WorkoutEditModal } from './WorkoutEditModal';
-import { ChevronLeft, ChevronRight, Calendar, LayoutGrid, MessageSquare, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, LayoutGrid, MessageSquare } from 'lucide-react';
 import { mapWorkoutToDesign, getWorkoutStatus } from '../utils/workoutMapper';
 import { SkeletonWeek, SkeletonMonth } from './SkeletonLoader';
+import { useToast } from './Toast';
+import { ErrorAlert } from './ErrorAlert';
 
 const API_BASE_URL = '/api';
 
@@ -18,6 +20,7 @@ export function WeekAheadView() {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
+  const toast = useToast();
 
   // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -121,20 +124,59 @@ export function WeekAheadView() {
     }
   }, [viewMode, weekOffset, currentMonth, currentYear]);
 
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't navigate if modal is open or user is typing in an input
+      if (editModalOpen || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          handlePrevious();
+          break;
+        case 'ArrowRight':
+          handleNext();
+          break;
+        case 't':
+        case 'T':
+          // Go to today
+          if (viewMode === 'week') {
+            setWeekOffset(0);
+          } else {
+            const now = new Date();
+            setCurrentMonth(now.getMonth() + 1);
+            setCurrentYear(now.getFullYear());
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, editModalOpen]);
+
   // Toggle workout completion
   const toggleWorkoutStatus = async (workoutId) => {
     // Skip placeholder workouts
     if (workoutId.startsWith('placeholder-')) return;
-    
+
     try {
       const response = await axios.put(`${API_BASE_URL}/workouts/${workoutId}/complete`);
       const updatedWorkout = mapWorkoutToDesign(response.data.workout);
-      
+
       // Update workouts array
-      setWorkouts(prevWorkouts => 
+      setWorkouts(prevWorkouts =>
         prevWorkouts.map(w => w.id === workoutId ? updatedWorkout : w)
       );
-      
+
+      // Show feedback
+      const isCompleted = updatedWorkout.status === 'completed';
+      toast.success(isCompleted ? 'Workout marked as complete!' : 'Workout marked as incomplete');
+
       // Refresh progress
       if (viewMode === 'week') {
         const progressResponse = await axios.get(`${API_BASE_URL}/workouts/progress`, {
@@ -147,7 +189,9 @@ export function WeekAheadView() {
       }
     } catch (err) {
       console.error('Error toggling workout status:', err);
-      setError(err.response?.data?.error || 'Failed to update workout');
+      const errorMsg = err.response?.data?.error || 'Failed to update workout';
+      setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
@@ -318,25 +362,19 @@ export function WeekAheadView() {
             </div>
           </div>
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-              <button
-                onClick={() => {
-                  setError(null);
-                  if (viewMode === 'week') {
-                    fetchWeekWorkouts(weekOffset);
-                  } else {
-                    fetchMonthWorkouts(currentYear, currentMonth);
-                  }
-                }}
-                className="text-sm text-red-600 hover:text-red-800 font-medium transition-colors"
-              >
-                Retry
-              </button>
-            </div>
+            <ErrorAlert
+              message={error}
+              onRetry={() => {
+                setError(null);
+                if (viewMode === 'week') {
+                  fetchWeekWorkouts(weekOffset);
+                } else {
+                  fetchMonthWorkouts(currentYear, currentMonth);
+                }
+              }}
+              onDismiss={() => setError(null)}
+              className="mb-4"
+            />
           )}
           {viewMode === 'week' && (
             <div className="text-sm text-[#1e1b18]">
@@ -362,7 +400,7 @@ export function WeekAheadView() {
                   </p>
                   <button
                     onClick={() => {
-                      const chatTab = document.querySelector('[aria-label="Chat"]');
+                      const chatTab = document.getElementById('tab-chat');
                       if (chatTab) chatTab.click();
                     }}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-persian-blue text-white rounded-lg hover:bg-persian-blue-hover transition-colors font-medium"
@@ -373,7 +411,7 @@ export function WeekAheadView() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-7 gap-4 min-w-max">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 {workouts.map((workout) => (
                   <WorkoutCard
                     key={workout.id}

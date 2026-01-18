@@ -16,7 +16,7 @@ export function SkeletonCard() {
 
 export function SkeletonWeek() {
   return (
-    <div className="grid grid-cols-7 gap-4 min-w-max">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
       {[...Array(7)].map((_, index) => (
         <SkeletonCard key={index} />
       ))}

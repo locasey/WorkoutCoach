@@ -2,9 +2,34 @@
 
 Last Updated: 2026-01-18 by Claude
 
-## Current Sprint: UX Phase 4 - Mobile Optimization
+## Current Sprint: UX Phase 6 - Accessibility Audit
 
 ### Completed
+- [x] Install @axe-core/react - Done: 2026-01-18 by Claude
+  - Added as dev dependency
+  - Automatically runs in development mode
+- [x] Initialize axe-core in main.jsx - Done: 2026-01-18 by Claude
+  - Dynamically imports in dev mode only
+  - Logs accessibility violations to console
+- [x] Reduced motion support - Done: 2026-01-18 by Claude (Phase 3)
+  - Added @media (prefers-reduced-motion: reduce) in index.css
+  - All animations respect user preferences
+- [x] Keyboard navigation - Done: 2026-01-18 by Claude (Phase 2)
+  - Arrow keys for week/month navigation
+  - 'T' key to jump to today
+  - Escape key to close modals
+  - Tab navigation works throughout
+  - Focus-visible styles applied
+
+### In Progress
+(None - Sprint complete!)
+
+### Pending
+(None)
+
+## Previous Sprints
+
+### UX Phase 4 - Mobile Optimization (Completed 2026-01-18)
 - [x] Install react-swipeable dependency - Done: 2026-01-18 by Claude
 - [x] Swipe gestures for week navigation - Done: 2026-01-18 by Claude
   - Left swipe goes to next week

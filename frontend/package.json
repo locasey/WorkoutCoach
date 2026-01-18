@@ -16,6 +16,7 @@
     "react-swipeable": "^7.0.2"
   },
   "devDependencies": {
+    "@axe-core/react": "^4.11.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.23",

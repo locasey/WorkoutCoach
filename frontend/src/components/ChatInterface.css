@@ -58,7 +58,7 @@
 }
 
 .message.user .message-content {
-  background: #667eea;
+  background: var(--persian-blue);
   color: white;
   border-bottom-right-radius: 4px;
 }
@@ -80,7 +80,7 @@
   padding: 20px;
   background: #f9f9f9;
   border-radius: 8px;
-  border: 2px solid #667eea;
+  border: 2px solid var(--persian-blue);
 }
 
 .workout-plan-header {
@@ -97,7 +97,7 @@
 
 .export-button {
   padding: 8px 16px;
-  background: #667eea;
+  background: var(--persian-blue);
   color: white;
   border: none;
   border-radius: 6px;
@@ -107,7 +107,7 @@
 }
 
 .export-button:hover {
-  background: #5568d3;
+  background: var(--persian-blue-hover);
 }
 
 .plan-info {
@@ -150,7 +150,7 @@
 }
 
 .week-badge {
-  background: #667eea;
+  background: var(--persian-blue);
   color: white;
   padding: 4px 8px;
   border-radius: 4px;
@@ -206,12 +206,12 @@
 }
 
 .chat-input:focus {
-  border-color: #667eea;
+  border-color: var(--persian-blue);
 }
 
 .send-button {
   padding: 12px 24px;
-  background: #667eea;
+  background: var(--persian-blue);
   color: white;
   border: none;
   border-radius: 8px;
@@ -221,7 +221,7 @@
 }
 
 .send-button:hover:not(:disabled) {
-  background: #5568d3;
+  background: var(--persian-blue-hover);
 }
 
 .send-button:disabled {

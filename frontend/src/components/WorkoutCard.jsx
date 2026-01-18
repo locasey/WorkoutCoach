@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Check, Minus, Edit2, Clock, Gauge, Heart, StickyNote, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Minus, Edit2, Clock, Gauge, Heart, StickyNote, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 
-export function WorkoutCard({ workout, onToggle, onEdit }) {
+export function WorkoutCard({ workout, onToggle, onEdit, isToday = false }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const getStatusIcon = () => {
@@ -40,9 +40,17 @@ export function WorkoutCard({ workout, onToggle, onEdit }) {
   const isEmpty = !workout.type || workout.id?.startsWith('placeholder-');
 
   return (
-    <div className={`border-2 rounded-lg p-4 transition-all min-w-[140px] ${getCardStyles()}`}>
+    <div className={`border-2 rounded-lg p-4 transition-all min-w-[140px] ${getCardStyles()} ${isToday ? 'ring-2 ring-persian-blue ring-offset-2' : ''}`}>
       {/* Day Header */}
-      <div className="text-sm font-medium text-[#1e1b18]/60 mb-3">{workout.day}</div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm font-medium text-[#1e1b18]/60">{workout.day}</div>
+        {isToday && (
+          <div className="flex items-center gap-1 text-xs font-semibold text-persian-blue">
+            <Calendar className="w-3 h-3" />
+            Today
+          </div>
+        )}
+      </div>
       
       {/* Workout Content - Clickable (only if not empty) */}
       {!isEmpty ? (

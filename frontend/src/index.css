@@ -1,5 +1,38 @@
 @import 'tailwindcss';
 
+:root {
+  /* Primary Palette */
+  --muted-teal: #8eb19d;
+  --carbon-black: #1e1b18;
+  --almond-silk: #eacdc2;
+  --persian-blue: #072ac8;
+  --rust-brown: #a44200;
+
+  /* Extended Neutrals */
+  --gray-600: #4a4543;
+  --gray-400: #8a8582;
+  --gray-200: #d4cdc9;
+
+  /* Semantic Colors */
+  --error-red: #c62828;
+  --success-green: #2e7d32;
+
+  /* Hover States (10% darker) */
+  --persian-blue-hover: #0621a3;
+  --muted-teal-hover: #7a9d89;
+  --rust-brown-hover: #8a3800;
+
+  /* Transitions */
+  --transition-fast: 150ms ease-in-out;
+  --transition-normal: 250ms ease-in-out;
+  --transition-slow: 350ms ease-in-out;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -12,7 +45,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #eacdc2;
+  background: var(--almond-silk);
+  color: var(--carbon-black);
   min-height: 100vh;
 }
 
@@ -23,5 +57,50 @@ code {
 
 #root {
   min-height: 100vh;
+}
+
+/* Focus visible styles for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--persian-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skeleton loader animation */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.skeleton {
+  animation: shimmer 2s infinite linear;
+  background: linear-gradient(
+    90deg,
+    var(--gray-200) 0%,
+    var(--almond-silk) 50%,
+    var(--gray-200) 100%
+  );
+  background-size: 1000px 100%;
+  border-radius: 4px;
+}
+
+.skeleton-text {
+  height: 1em;
+  margin-bottom: 0.5em;
+  border-radius: 4px;
+}
+
+.skeleton-text:last-child {
+  margin-bottom: 0;
+  width: 80%;
+}
+
+.skeleton-card {
+  min-height: 200px;
+  border-radius: 8px;
 }
 

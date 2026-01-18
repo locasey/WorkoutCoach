@@ -48,7 +48,7 @@
 }
 
 .tab-navigation button.active {
-  background: #667eea;
+  background: var(--persian-blue);
   color: white;
 }
 

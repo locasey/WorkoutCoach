@@ -14,7 +14,7 @@ load_dotenv()
 
 # Import Base and models
 from database import Base
-from models import WorkoutPlan, Workout
+from models import WorkoutPlan, Workout, StravaActivity, StravaSession
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

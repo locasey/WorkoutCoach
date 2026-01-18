@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { WorkoutCard } from './WorkoutCard';
 import { MonthView } from './MonthView';
-import { ChevronLeft, ChevronRight, Calendar, LayoutGrid } from 'lucide-react';
+import { WorkoutEditModal } from './WorkoutEditModal';
+import { ChevronLeft, ChevronRight, Calendar, LayoutGrid, MessageSquare, AlertCircle } from 'lucide-react';
 import { mapWorkoutToDesign, getWorkoutStatus } from '../utils/workoutMapper';
+import { SkeletonWeek, SkeletonMonth } from './SkeletonLoader';
 
 const API_BASE_URL = '/api';
 
@@ -16,6 +18,10 @@ export function WeekAheadView() {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
+
+  // Edit modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedWorkout, setSelectedWorkout] = useState(null);
 
   // Fetch workouts for current week
   const fetchWeekWorkouts = async (offset = 0) => {
@@ -145,14 +151,55 @@ export function WeekAheadView() {
     }
   };
 
-  // Handle edit (placeholder for now)
+  // Handle edit - open modal
   const handleEdit = (workoutId) => {
     // Skip placeholder workouts
     if (workoutId.startsWith('placeholder-')) return;
-    
-    // TODO: Implement edit modal/form in Phase 7
-    console.log('Edit workout:', workoutId);
-    alert('Edit functionality coming in Phase 7!');
+
+    const workout = workouts.find(w => w.id === workoutId);
+    if (workout) {
+      setSelectedWorkout(workout);
+      setEditModalOpen(true);
+    }
+  };
+
+  // Handle save from edit modal
+  const handleSaveWorkout = (updatedDbWorkout) => {
+    const updatedWorkout = mapWorkoutToDesign(updatedDbWorkout);
+
+    // Update workouts array
+    setWorkouts(prevWorkouts =>
+      prevWorkouts.map(w => w.id === updatedWorkout.id ? updatedWorkout : w)
+    );
+  };
+
+  // Handle day click from month view - navigate to that week in week view
+  const handleDayClick = (date) => {
+    if (!date) return;
+
+    // Calculate the week offset from today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get the Monday of today's week
+    const todayDayOfWeek = today.getDay();
+    const todayMonday = new Date(today);
+    todayMonday.setDate(today.getDate() - (todayDayOfWeek === 0 ? 6 : todayDayOfWeek - 1));
+
+    // Get the Monday of the clicked date's week
+    const clickedDate = new Date(date);
+    clickedDate.setHours(0, 0, 0, 0);
+    const clickedDayOfWeek = clickedDate.getDay();
+    const clickedMonday = new Date(clickedDate);
+    clickedMonday.setDate(clickedDate.getDate() - (clickedDayOfWeek === 0 ? 6 : clickedDayOfWeek - 1));
+
+    // Calculate week difference
+    const diffTime = clickedMonday.getTime() - todayMonday.getTime();
+    const diffWeeks = Math.round(diffTime / (7 * 24 * 60 * 60 * 1000));
+
+    // Switch to week view with the calculated offset
+    setWeekOffset(diffWeeks);
+    setViewMode('week');
   };
 
   // Navigation handlers
@@ -200,18 +247,18 @@ export function WeekAheadView() {
     };
   };
 
+  // Check if today is in the current week
+  const isTodayInWeek = (scheduledDate) => {
+    if (!scheduledDate) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const workoutDate = new Date(scheduledDate);
+    workoutDate.setHours(0, 0, 0, 0);
+    return today.getTime() === workoutDate.getTime();
+  };
+
   const weekRange = viewMode === 'week' ? getWeekRange() : null;
   const monthName = new Date(currentYear, currentMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-  if (loading && workouts.length === 0) {
-    return (
-      <div className="max-w-full mx-auto p-6">
-        <div className="bg-white rounded-lg shadow-sm border border-[#8eb19d] p-6">
-          <div className="text-center text-[#1e1b18]">Loading workouts...</div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-full mx-auto p-6">
@@ -271,8 +318,24 @@ export function WeekAheadView() {
             </div>
           </div>
           {error && (
-            <div className="mb-2 text-sm text-red-600 bg-red-50 p-2 rounded">
-              {error}
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setError(null);
+                  if (viewMode === 'week') {
+                    fetchWeekWorkouts(weekOffset);
+                  } else {
+                    fetchMonthWorkouts(currentYear, currentMonth);
+                  }
+                }}
+                className="text-sm text-red-600 hover:text-red-800 font-medium transition-colors"
+              >
+                Retry
+              </button>
             </div>
           )}
           {viewMode === 'week' && (
@@ -285,9 +348,29 @@ export function WeekAheadView() {
         {/* View Content */}
         {viewMode === 'week' ? (
           <div className="p-6 overflow-x-auto">
-            {workouts.length === 0 ? (
-              <div className="text-center text-[#1e1b18]/60 py-8">
-                No workouts scheduled for this week. Create a workout plan to get started!
+            {loading && workouts.length === 0 ? (
+              <SkeletonWeek />
+            ) : workouts.length === 0 || workouts.every(w => !w.type) ? (
+              <div className="text-center py-12">
+                <div className="max-w-md mx-auto">
+                  <MessageSquare className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-lg font-semibold text-carbon-black mb-2">
+                    No workouts scheduled
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Get started by creating a personalized workout plan through the Chat interface.
+                  </p>
+                  <button
+                    onClick={() => {
+                      const chatTab = document.querySelector('[aria-label="Chat"]');
+                      if (chatTab) chatTab.click();
+                    }}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-persian-blue text-white rounded-lg hover:bg-persian-blue-hover transition-colors font-medium"
+                  >
+                    <MessageSquare className="w-5 h-5" />
+                    Create Workout Plan
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-7 gap-4 min-w-max">
@@ -295,6 +378,7 @@ export function WeekAheadView() {
                   <WorkoutCard
                     key={workout.id}
                     workout={workout}
+                    isToday={isTodayInWeek(workout.scheduledDate)}
                     onToggle={() => toggleWorkoutStatus(workout.id)}
                     onEdit={() => handleEdit(workout.id)}
                   />
@@ -303,13 +387,18 @@ export function WeekAheadView() {
             )}
           </div>
         ) : (
-          <MonthView 
-            workouts={workouts}
-            onToggle={toggleWorkoutStatus}
-            onEdit={handleEdit}
-            currentMonth={currentMonth}
-            currentYear={currentYear}
-          />
+          loading && workouts.length === 0 ? (
+            <SkeletonMonth />
+          ) : (
+            <MonthView
+              workouts={workouts}
+              onToggle={toggleWorkoutStatus}
+              onEdit={handleEdit}
+              onDayClick={handleDayClick}
+              currentMonth={currentMonth}
+              currentYear={currentYear}
+            />
+          )
         )}
       </div>
     </div>

@@ -76,7 +76,7 @@ export function PlanManager() {
     }
   };
 
-  // Delete a plan
+  // Delete a plan with optimistic update
   const handleDelete = async (planId) => {
     // Prevent deleting active plan
     if (planId === activePlanId) {
@@ -88,12 +88,25 @@ export function PlanManager() {
       return;
     }
 
+    // Store the plan in case we need to restore it
+    const deletedPlan = plans.find(p => p.id === planId);
+    
+    // Optimistically remove from UI immediately
+    setPlans(prevPlans => prevPlans.filter(p => p.id !== planId));
+
     try {
       await axios.delete(`${API_BASE_URL}/workout-plans/${planId}`);
       toast.success('Plan deleted successfully');
-      fetchPlans(); // Refresh list
     } catch (err) {
       console.error('Error deleting plan:', err);
+      
+      // Restore the plan on error
+      if (deletedPlan) {
+        setPlans(prevPlans => [...prevPlans, deletedPlan].sort((a, b) => 
+          new Date(b.created_at) - new Date(a.created_at)
+        ));
+      }
+      
       toast.error(err.response?.data?.error || 'Failed to delete plan');
     }
   };

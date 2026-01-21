@@ -4,16 +4,17 @@ import { useSwipeable } from 'react-swipeable';
 import { WorkoutCard } from './WorkoutCard';
 import { MonthView } from './MonthView';
 import { WorkoutEditModal } from './WorkoutEditModal';
-import { ChevronLeft, ChevronRight, Calendar, LayoutGrid, MessageSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, LayoutGrid, MessageSquare, CheckCircle, Clock, MapPin, Edit3 } from 'lucide-react';
 import { mapWorkoutToDesign, getWorkoutStatus } from '../utils/workoutMapper';
 import { SkeletonWeek, SkeletonMonth } from './SkeletonLoader';
 import { useToast } from './Toast';
 import { ErrorAlert } from './ErrorAlert';
+import './WeekAheadView.css';
 
 const API_BASE_URL = '/api';
 
-export function WeekAheadView() {
-  const [viewMode, setViewMode] = useState('week');
+export function WeekAheadView({ initialView = 'week' }) {
+  const [viewMode, setViewMode] = useState(initialView);
   const [workouts, setWorkouts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,6 +23,7 @@ export function WeekAheadView() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const toast = useToast();
 
   // Edit modal state
@@ -78,6 +80,14 @@ export function WeekAheadView() {
       });
       
       setWorkouts(weekWorkouts);
+      
+      // Set initial selected day index to today if we're in the current week
+      if (offset === 0) {
+        const todayIndex = weekWorkouts.findIndex(w => isTodayInWeek(w.scheduledDate));
+        if (todayIndex !== -1) {
+          setSelectedDayIndex(todayIndex);
+        }
+      }
       
       // Fetch progress
       const progressResponse = await axios.get(`${API_BASE_URL}/workouts/progress`, {
@@ -306,6 +316,14 @@ export function WeekAheadView() {
     }
   };
 
+  // Swipe handlers for mobile week navigation
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => handleNext(),
+    onSwipedRight: () => handlePrevious(),
+    preventScrollOnSwipe: true,
+    trackMouse: false
+  });
+
   // Get week range for display
   const getWeekRange = () => {
     const today = new Date();
@@ -332,49 +350,17 @@ export function WeekAheadView() {
     return today.getTime() === workoutDate.getTime();
   };
 
-  // Get 3-day view for mobile (yesterday, today, tomorrow)
-  const getMobileWorkouts = () => {
-    if (!workouts.length) return [];
-    
-    // Find today's index
-    const todayIndex = workouts.findIndex(w => isTodayInWeek(w.scheduledDate));
-    
-    if (todayIndex === -1) {
-      // If today is not found, just show first 3 days
-      return workouts.slice(0, 3);
-    }
-    
-    // Show yesterday, today, tomorrow (3 days centered on today)
-    const startIndex = Math.max(0, todayIndex - 1);
-    const endIndex = Math.min(workouts.length, startIndex + 3);
-    
-    return workouts.slice(startIndex, endIndex);
-  };
+  const activeWorkout = workouts[selectedDayIndex] || null;
+  const isActiveToday = activeWorkout && isTodayInWeek(activeWorkout.scheduledDate);
 
   const weekRange = viewMode === 'week' ? getWeekRange() : null;
   const monthName = new Date(currentYear, currentMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  // Swipe handlers for mobile navigation
-  const swipeHandlers = useSwipeable({
-    onSwipedLeft: () => {
-      if (viewMode === 'week') {
-        handleNext();
-      }
-    },
-    onSwipedRight: () => {
-      if (viewMode === 'week') {
-        handlePrevious();
-      }
-    },
-    trackMouse: false, // Only track touch, not mouse
-    preventScrollOnSwipe: true,
-  });
-
   return (
-    <div className="max-w-full mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-sm border border-[#8eb19d]">
-        {/* Header */}
-        <div className="p-6 border-b border-[#8eb19d]">
+    <div className="max-w-full mx-auto p-4 sm:p-6">
+      <div className="bg-white rounded-lg shadow-sm">
+        {/* Header - Hidden on mobile, shown on desktop */}
+        <div className="hidden md:block p-6">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-semibold text-[#1e1b18]">
               {viewMode === 'week' 
@@ -388,10 +374,8 @@ export function WeekAheadView() {
                   const newMode = viewMode === 'week' ? 'month' : 'week';
                   setViewMode(newMode);
                   if (newMode === 'week') {
-                    // Reset to current week when switching to week view
                     setWeekOffset(0);
                   } else {
-                    // Set to current month when switching to month view
                     const now = new Date();
                     setCurrentMonth(now.getMonth() + 1);
                     setCurrentYear(now.getFullYear());
@@ -449,9 +433,44 @@ export function WeekAheadView() {
           )}
         </div>
 
+        {/* Mobile View Navigation & Header */}
+        <div className="md:hidden mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-bold text-carbon-black">
+              {weekRange ? `${weekRange.start} - ${weekRange.end}` : ''}
+            </h2>
+            <div className="flex gap-1">
+              <button onClick={handlePrevious} className="p-2 text-carbon-black"><ChevronLeft className="w-5 h-5" /></button>
+              <button onClick={handleNext} className="p-2 text-carbon-black"><ChevronRight className="w-5 h-5" /></button>
+            </div>
+          </div>
+          
+          {/* Day Picker */}
+          <div className="day-picker">
+            {workouts.map((workout, index) => {
+              const date = new Date(workout.scheduledDate);
+              const dayNum = date.getDate();
+              const isToday = isTodayInWeek(workout.scheduledDate);
+              const isActive = selectedDayIndex === index;
+              
+              return (
+                <div 
+                  key={workout.id} 
+                  className={`day-item ${isActive ? 'active' : ''} ${isToday ? 'today' : ''}`}
+                  onClick={() => setSelectedDayIndex(index)}
+                >
+                  <span className="day-name">{workout.day}</span>
+                  <span className="day-number">{dayNum}</span>
+                  <div className={`day-status-indicator status-${workout.status}`} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* View Content */}
         {viewMode === 'week' ? (
-          <div className="p-6 overflow-x-auto" {...swipeHandlers}>
+          <div className="md:p-6" {...swipeHandlers}>
             {loading && workouts.length === 0 ? (
               <SkeletonWeek />
             ) : workouts.length === 0 || workouts.every(w => !w.type) ? (
@@ -461,7 +480,7 @@ export function WeekAheadView() {
                   <h3 className="text-lg font-semibold text-carbon-black mb-2">
                     No workouts scheduled
                   </h3>
-                  <p className="text-gray-600 mb-6">
+                  <p className="text-gray-600 mb-6 px-4">
                     Get started by creating a personalized workout plan through the Chat interface.
                   </p>
                   <button
@@ -477,17 +496,87 @@ export function WeekAheadView() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                {(isMobile ? getMobileWorkouts() : workouts).map((workout) => (
-                  <WorkoutCard
-                    key={workout.id}
-                    workout={workout}
-                    isToday={isTodayInWeek(workout.scheduledDate)}
-                    onToggle={() => toggleWorkoutStatus(workout.id)}
-                    onEdit={() => handleEdit(workout.id)}
-                  />
-                ))}
-              </div>
+              <>
+                {/* Mobile: Today Hero Section */}
+                <div className="md:hidden">
+                  {activeWorkout && (
+                    <div className="today-hero">
+                      <div className="hero-header">
+                        <div className="hero-label">
+                          {isActiveToday ? 'Today\'s Training' : `${activeWorkout.day}'s Training`}
+                        </div>
+                        {activeWorkout.status === 'completed' && (
+                          <div className="text-success-green flex items-center gap-1 font-bold text-xs">
+                            <CheckCircle className="w-4 h-4" />
+                            DONE
+                          </div>
+                        )}
+                      </div>
+                      
+                      <h3 className="hero-title">
+                        {activeWorkout.status === 'rest' ? 'Rest Day' : (activeWorkout.type || 'No Workout')}
+                      </h3>
+                      
+                      {activeWorkout.status !== 'rest' && activeWorkout.type && (
+                        <>
+                          <div className="hero-metrics">
+                            <div className="hero-metric">
+                              <span className="metric-value">{activeWorkout.duration || '--'}</span>
+                              <span className="metric-label">Duration</span>
+                            </div>
+                            <div className="hero-metric">
+                              <span className="metric-value">{activeWorkout.distance || '--'}</span>
+                              <span className="metric-label">Distance</span>
+                            </div>
+                          </div>
+                          
+                          {activeWorkout.notes && (
+                            <p className="hero-description line-clamp-3">
+                              {activeWorkout.notes}
+                            </p>
+                          )}
+                          
+                          <div className="hero-actions">
+                            <button 
+                              onClick={() => toggleWorkoutStatus(activeWorkout.id)}
+                              className={`btn-hero ${activeWorkout.status === 'completed' ? 'btn-hero-secondary' : 'btn-hero-primary'}`}
+                            >
+                              <CheckCircle className="w-5 h-5" />
+                              {activeWorkout.status === 'completed' ? 'Unmark Complete' : 'Mark Complete'}
+                            </button>
+                            <button 
+                              onClick={() => handleEdit(activeWorkout.id)}
+                              className="btn-hero btn-hero-secondary"
+                            >
+                              <Edit3 className="w-5 h-5" />
+                              Edit
+                            </button>
+                          </div>
+                        </>
+                      )}
+                      
+                      {activeWorkout.status === 'rest' && (
+                        <p className="hero-description mt-4">
+                          Enjoy your rest day! Recovery is just as important as the work.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Desktop: Grid Layout */}
+                <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                  {workouts.map((workout) => (
+                    <WorkoutCard
+                      key={workout.id}
+                      workout={workout}
+                      isToday={isTodayInWeek(workout.scheduledDate)}
+                      onToggle={() => toggleWorkoutStatus(workout.id)}
+                      onEdit={() => handleEdit(workout.id)}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </div>
         ) : (
@@ -505,6 +594,16 @@ export function WeekAheadView() {
           )
         )}
       </div>
+
+      <WorkoutEditModal
+        isOpen={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false);
+          setSelectedWorkout(null);
+        }}
+        workout={selectedWorkout}
+        onSave={handleSaveWorkout}
+      />
     </div>
   );
 }

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Check, Minus, Edit2, Clock, Gauge, Heart, StickyNote, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { Check, Minus, Edit2, Clock, Gauge, Heart, StickyNote, ChevronDown, ChevronUp, Calendar, Zap } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import './WorkoutCard.css';
 
 export function WorkoutCard({ workout, onToggle, onEdit, isToday = false }) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
 
   // Track when workout status changes to completed
@@ -25,152 +25,72 @@ export function WorkoutCard({ workout, onToggle, onEdit, isToday = false }) {
     }
   }, [workout.status]);
 
-  const getStatusIcon = () => {
-    if (workout.status === 'completed') {
-      return <Check className="w-4 h-4 text-[#8eb19d]" />;
-    }
-    if (workout.status === 'rest') {
-      return <Minus className="w-4 h-4 text-[#a44200]" />;
-    }
-    return null;
-  };
-
-  const getCardStyles = () => {
-    if (workout.status === 'completed') {
-      return 'border-[#8eb19d] bg-[#8eb19d]/10';
-    }
-    if (workout.status === 'rest') {
-      return 'border-[#a44200] bg-[#a44200]/10';
-    }
-    return 'border-[#072ac8] bg-white';
-  };
-
-  const getIntensityColor = (intensity) => {
-    switch (intensity) {
-      case 'low':
-        return 'bg-[#8eb19d]';
-      case 'moderate':
-        return 'bg-[#072ac8]';
-      case 'high':
-        return 'bg-[#a44200]';
-      default:
-        return 'bg-gray-300';
-    }
-  };
-
   const isEmpty = !workout.type || workout.id?.startsWith('placeholder-');
+  
+  // Extract duration value and unit
+  const durationMatch = workout.duration?.match(/(\d+)\s*(.*)/);
+  const durationValue = durationMatch ? durationMatch[1] : '';
+  const durationUnit = durationMatch ? durationMatch[2] : '';
 
   return (
-    <div className={`border-2 rounded-lg p-4 transition-all min-w-[140px] ${getCardStyles()} ${isToday ? 'ring-2 ring-persian-blue ring-offset-2' : ''}`}>
-      {/* Day Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-sm font-medium text-[#1e1b18]/60">{workout.day}</div>
+    <div className={`workout-card ${isToday ? 'today' : ''} ${workout.status === 'completed' ? 'completed' : ''} ${workout.status === 'rest' ? 'rest' : ''} ${isEmpty ? 'empty' : ''}`}>
+      <div className="card-header">
+        <span className="card-day">{workout.day}</span>
         {isToday && (
-          <div className="flex items-center gap-1 text-xs font-semibold text-persian-blue">
+          <div className="flex items-center gap-1 text-[10px] font-bold text-persian-blue uppercase">
             <Calendar className="w-3 h-3" />
             Today
           </div>
         )}
       </div>
-      
-      {/* Workout Content - Clickable (only if not empty) */}
+
       {!isEmpty ? (
-        <div 
-          className="mb-4 cursor-pointer"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          <div className="font-medium text-[#1e1b18] mb-1 flex items-center justify-between">
-            <span>{workout.type}</span>
-            {workout.status !== 'rest' && (
-              isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-            )}
+        <>
+          <div className="card-title">{workout.status === 'rest' ? 'Rest Day' : workout.type}</div>
+          
+          {workout.status !== 'rest' && (
+            <div className="card-duration">
+              {durationValue || '--'}
+              <span className="duration-unit">{durationUnit || 'min'}</span>
+            </div>
+          )}
+
+          <div className="side-by-side">
+            <div className="metrics-group">
+              <div className="metrics-label">Planned</div>
+              <div className="metrics-row">
+                <span className="planned-value">{workout.distance || '--'}</span>
+              </div>
+            </div>
+            <div className="metrics-group">
+              <div className="metrics-label">Actual</div>
+              <div className="metrics-row">
+                <span className="actual-value">--</span>
+              </div>
+            </div>
           </div>
-          {workout.distance && (
-            <div className="text-sm text-[#1e1b18]/70">{workout.distance}</div>
-          )}
-        </div>
+
+          <div className="card-actions">
+            <button
+              onClick={onToggle}
+              disabled={workout.status === 'rest'}
+              className={`btn-icon complete ${workout.status === 'completed' ? 'active' : ''} ${justCompleted ? 'checkmark-pop' : ''}`}
+              aria-label={workout.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
+            >
+              <Check className="w-5 h-5" />
+            </button>
+            <button
+              onClick={onEdit}
+              className="btn-icon"
+              aria-label="Edit workout"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+          </div>
+        </>
       ) : (
-        <div className="mb-4 text-sm text-[#1e1b18]/40 italic">
+        <div className="mt-4 text-xs text-gray-400 italic">
           No workout scheduled
-        </div>
-      )}
-
-      {/* Expanded Details */}
-      <div 
-        className={`overflow-hidden transition-all duration-[var(--transition-normal)] ${
-          isExpanded && workout.status !== 'rest' ? 'max-h-96 opacity-100 mb-4' : 'max-h-0 opacity-0'
-        }`}
-      >
-        <div className="space-y-2 pb-3 border-b border-[#1e1b18]/10">
-          {workout.duration && (
-            <div className="flex items-center gap-2 text-sm text-[#1e1b18]/70">
-              <Clock className="w-4 h-4 text-[#072ac8]" />
-              <span>{workout.duration}</span>
-            </div>
-          )}
-          {workout.pace && (
-            <div className="flex items-center gap-2 text-sm text-[#1e1b18]/70">
-              <Gauge className="w-4 h-4 text-[#072ac8]" />
-              <span>{workout.pace}</span>
-            </div>
-          )}
-          {workout.heartRateZone && (
-            <div className="flex items-center gap-2 text-sm text-[#1e1b18]/70">
-              <Heart className="w-4 h-4 text-[#a44200]" />
-              <span>{workout.heartRateZone}</span>
-            </div>
-          )}
-          {workout.intensity && (
-            <div className="mt-3">
-              <div className="flex items-center justify-between text-xs text-[#1e1b18]/60 mb-1">
-                <span>Intensity</span>
-                <span className="capitalize">{workout.intensity}</span>
-              </div>
-              <div className="h-2 bg-[#eacdc2] rounded-full overflow-hidden">
-                <div 
-                  className={`h-full transition-all ${getIntensityColor(workout.intensity)}`}
-                  style={{ 
-                    width: workout.intensity === 'low' ? '33%' : 
-                           workout.intensity === 'moderate' ? '66%' : '100%' 
-                  }}
-                />
-              </div>
-            </div>
-          )}
-          {workout.notes && (
-            <div className="mt-2 p-2 bg-[#eacdc2]/40 rounded text-xs text-[#1e1b18]/70 flex items-start gap-2">
-              <StickyNote className="w-3 h-3 mt-0.5 flex-shrink-0 text-[#072ac8]" />
-              <span>{workout.notes}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Status Checkbox - Only show if not empty */}
-      {!isEmpty && (
-        <div className="flex items-center justify-between">
-          <button
-            onClick={onToggle}
-            disabled={workout.status === 'rest'}
-            className={`w-8 h-8 sm:w-6 sm:h-6 border-2 rounded flex items-center justify-center transition-colors touch-manipulation ${
-              workout.status === 'completed'
-                ? 'border-[#8eb19d] bg-[#8eb19d]'
-                : workout.status === 'rest'
-                ? 'border-[#a44200] bg-[#a44200] cursor-not-allowed'
-                : 'border-[#072ac8] hover:border-[#072ac8]/70'
-            } ${justCompleted ? 'checkmark-pop' : ''}`}
-            aria-label={workout.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
-          >
-            {getStatusIcon()}
-          </button>
-
-          <button
-            onClick={onEdit}
-            className="p-2 sm:p-1.5 text-[#1e1b18]/60 hover:text-[#072ac8] hover:bg-[#eacdc2] rounded transition-colors touch-manipulation min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
-            aria-label="Edit workout"
-          >
-            <Edit2 className="w-5 h-5 sm:w-4 sm:h-4" />
-          </button>
         </div>
       )}
     </div>

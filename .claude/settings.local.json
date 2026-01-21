@@ -3,7 +3,9 @@
     "allow": [
       "Bash(ls:*)",
       "Bash(venv/Scripts/python:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(\"venv\\\\Scripts\\\\alembic.exe\" upgrade head)",
+      "Bash(dir:*)"
     ]
   }
 }

@@ -27,8 +27,9 @@ A locally hosted web application that generates personalized workout plans throu
 ### 2.2 Non-Functional Requirements
 
 - **NFR1**: Application runs locally (localhost)
-- **NFR2**: Responsive web interface
-- **NFR3**: Fast response time for chat interactions (< 5 seconds)
+- **NFR2**: Mobile-first responsive web interface (optimized for one-handed training use)
+- **NFR3**: High-glancability UI for workout tracking (large metrics, high contrast)
+- **NFR4**: Fast response time for chat interactions (< 5 seconds)
 - **NFR4**: Secure API key management for Strava and LLM services
 - **NFR5**: Excel export should be properly formatted and readable
 

@@ -1,0 +1,31 @@
+{
+  "prompts": [
+    {
+      "id": "5k_8week",
+      "prompt": "Generate me an 8 week 5k training plan",
+      "expected": {
+        "duration_weeks": 8,
+        "goal_keywords": ["5k", "5K", "5 km", "5km"],
+        "should_have_types": ["easy_run", "intervals", "long_run"]
+      }
+    },
+    {
+      "id": "half_marathon_12week",
+      "prompt": "Create a 12-week half marathon training plan for an intermediate runner",
+      "expected": {
+        "duration_weeks": 12,
+        "goal_keywords": ["half marathon", "half-marathon", "13.1", "21k", "21.1"],
+        "should_have_types": ["easy_run", "tempo", "long_run"]
+      }
+    },
+    {
+      "id": "marathon_16week",
+      "prompt": "I want to run my first marathon in 16 weeks",
+      "expected": {
+        "duration_weeks": 16,
+        "goal_keywords": ["marathon", "26.2", "42k", "42.2"],
+        "should_have_types": ["easy_run", "tempo", "long_run"]
+      }
+    }
+  ]
+}

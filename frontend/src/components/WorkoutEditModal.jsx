@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { X, Save, AlertCircle, Check } from 'lucide-react';
+import { X, Save, AlertCircle, Check, Trash2 } from 'lucide-react';
 import { useToast } from './Toast';
+import './WorkoutEditModal.css';
 
 const API_BASE_URL = '/api';
 
@@ -122,18 +123,6 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
       return;
     }
 
-    // Show confirmation if there are changes
-    if (hasChanges) {
-      setShowConfirmation(true);
-      return;
-    }
-
-    // No changes, just close
-    onClose();
-  };
-
-  const handleConfirmedSave = async () => {
-    setShowConfirmation(false);
     setLoading(true);
     setError(null);
 
@@ -177,238 +166,125 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
 
   const handleClose = () => {
     if (hasChanges) {
-      setShowConfirmation(true);
+      if (window.confirm('You have unsaved changes. Discard them?')) {
+        onClose();
+      }
     } else {
       onClose();
     }
   };
 
-  const handleDiscardChanges = () => {
-    setShowConfirmation(false);
-    setHasChanges(false);
-    onClose();
-  };
-
   if (!isOpen || !workout) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={handleClose}
-      />
-
-      {/* Modal */}
-      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-[#8eb19d]">
-          <h2 className="text-lg font-semibold text-[#1e1b18]">
-            Edit Workout - {workout.day}
-          </h2>
-          <button
-            onClick={handleClose}
-            className="p-1 text-[#1e1b18]/60 hover:text-[#1e1b18] hover:bg-[#eacdc2] rounded transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
+    <>
+      <div className="modal-backdrop" onClick={handleClose} />
+      <div className="modal-container">
+        <div className="md:hidden bottom-sheet-handle" />
+        
+        <div className="modal-header">
+          <h2>Edit Workout</h2>
+          <button onClick={handleClose} className="p-2 text-gray-400 hover:text-black">
+            <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* Error display */}
+        <div className="modal-body">
           {error && (
-            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm mb-4">
               <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Workout Type */}
-          <div>
-            <label htmlFor="type" className="block text-sm font-medium text-[#1e1b18] mb-1">
-              Workout Type
-            </label>
-            <select
-              id="type"
-              name="type"
-              value={formData.type}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-[#8eb19d] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#072ac8] focus:border-transparent"
-            >
-              <option value="">Select a type</option>
-              {WORKOUT_TYPES.map(type => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Distance */}
-          <div>
-            <label htmlFor="distance_km" className="block text-sm font-medium text-[#1e1b18] mb-1">
-              Distance (km)
-            </label>
-            <input
-              type="number"
-              id="distance_km"
-              name="distance_km"
-              value={formData.distance_km}
-              onChange={handleInputChange}
-              min="0"
-              step="0.1"
-              placeholder="e.g., 10.5"
-              className="w-full px-3 py-2 border border-[#8eb19d] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#072ac8] focus:border-transparent"
-            />
-          </div>
-
-          {/* Duration */}
-          <div>
-            <label htmlFor="duration_minutes" className="block text-sm font-medium text-[#1e1b18] mb-1">
-              Duration (minutes)
-            </label>
-            <input
-              type="number"
-              id="duration_minutes"
-              name="duration_minutes"
-              value={formData.duration_minutes}
-              onChange={handleInputChange}
-              min="0"
-              step="1"
-              placeholder="e.g., 45"
-              className="w-full px-3 py-2 border border-[#8eb19d] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#072ac8] focus:border-transparent"
-            />
-          </div>
-
-          {/* Pace */}
-          <div>
-            <label htmlFor="pace" className="block text-sm font-medium text-[#1e1b18] mb-1">
-              Pace
-            </label>
-            <input
-              type="text"
-              id="pace"
-              name="pace"
-              value={formData.pace}
-              onChange={handleInputChange}
-              placeholder="e.g., 5:30/km or easy"
-              className="w-full px-3 py-2 border border-[#8eb19d] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#072ac8] focus:border-transparent"
-            />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label htmlFor="notes" className="block text-sm font-medium text-[#1e1b18] mb-1">
-              Notes
-            </label>
-            <textarea
-              id="notes"
-              name="notes"
-              value={formData.notes}
-              onChange={handleInputChange}
-              rows={3}
-              placeholder="Additional notes for this workout..."
-              className="w-full px-3 py-2 border border-[#8eb19d] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#072ac8] focus:border-transparent resize-none"
-            />
-          </div>
-
-          {/* Scheduled Date (read-only) */}
-          {workout._original?.scheduled_date && (
-            <div className="pt-2 border-t border-[#8eb19d]/30">
-              <p className="text-sm text-[#1e1b18]/60">
-                Scheduled: {new Date(workout._original.scheduled_date).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </p>
+          <form id="edit-workout-form" onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">Workout Type</label>
+              <select
+                name="type"
+                value={formData.type}
+                onChange={handleInputChange}
+                className="form-select"
+              >
+                <option value="">Select a type</option>
+                {WORKOUT_TYPES.map(type => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t border-[#8eb19d]">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="flex-1 px-4 py-2 border border-[#8eb19d] text-[#1e1b18] rounded-lg hover:bg-[#eacdc2] transition-colors"
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-[#072ac8] text-white rounded-lg hover:bg-[#072ac8]/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-              disabled={loading || !hasChanges}
-            >
-              {loading ? (
-                <>
-                  <span className="animate-spin">...</span>
-                  Saving
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  Save Changes
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Confirmation Dialog */}
-      {showConfirmation && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30" />
-          <div className="relative bg-white rounded-lg shadow-xl p-6 mx-4 max-w-sm">
-            <h3 className="text-lg font-semibold text-[#1e1b18] mb-2">
-              {hasChanges ? 'Save Changes?' : 'Unsaved Changes'}
-            </h3>
-            <p className="text-[#1e1b18]/70 mb-4">
-              {hasChanges
-                ? 'Are you sure you want to save these changes to the workout?'
-                : 'You have unsaved changes. Do you want to discard them?'}
-            </p>
-            <div className="flex gap-3">
-              {hasChanges ? (
-                <>
-                  <button
-                    onClick={() => setShowConfirmation(false)}
-                    className="flex-1 px-4 py-2 border border-[#8eb19d] text-[#1e1b18] rounded-lg hover:bg-[#eacdc2] transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleConfirmedSave}
-                    className="flex-1 px-4 py-2 bg-[#072ac8] text-white rounded-lg hover:bg-[#072ac8]/90 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Check className="w-4 h-4" />
-                    Confirm
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setShowConfirmation(false)}
-                    className="flex-1 px-4 py-2 border border-[#8eb19d] text-[#1e1b18] rounded-lg hover:bg-[#eacdc2] transition-colors"
-                  >
-                    Keep Editing
-                  </button>
-                  <button
-                    onClick={handleDiscardChanges}
-                    className="flex-1 px-4 py-2 bg-[#a44200] text-white rounded-lg hover:bg-[#a44200]/90 transition-colors"
-                  >
-                    Discard
-                  </button>
-                </>
-              )}
+            <div className="flex gap-4">
+              <div className="form-group flex-1">
+                <label className="form-label">Duration (min)</label>
+                <input
+                  type="number"
+                  name="duration_minutes"
+                  value={formData.duration_minutes}
+                  onChange={handleInputChange}
+                  placeholder="45"
+                  className="form-input"
+                />
+              </div>
+              <div className="form-group flex-1">
+                <label className="form-label">Distance (km)</label>
+                <input
+                  type="number"
+                  name="distance_km"
+                  value={formData.distance_km}
+                  onChange={handleInputChange}
+                  placeholder="10"
+                  step="0.1"
+                  className="form-input"
+                />
+              </div>
             </div>
-          </div>
+
+            <div className="form-group">
+              <label className="form-label">Pace</label>
+              <input
+                type="text"
+                name="pace"
+                value={formData.pace}
+                onChange={handleInputChange}
+                placeholder="5:30/km"
+                className="form-input"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Notes</label>
+              <textarea
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                rows={3}
+                placeholder="Target Zone 2 heart rate..."
+                className="form-textarea resize-none"
+              />
+            </div>
+          </form>
         </div>
-      )}
-    </div>
+
+        <div className="modal-footer">
+          <button 
+            type="button" 
+            onClick={handleClose} 
+            className="btn-modal btn-modal-secondary"
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            form="edit-workout-form"
+            className="btn-modal btn-modal-primary"
+            disabled={loading || !hasChanges}
+          >
+            {loading ? 'Saving...' : 'Save Workout'}
+          </button>
+        </div>
+      </div>
+    </>
   );
 }

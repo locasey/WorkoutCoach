@@ -1,0 +1,146 @@
+.workout-card {
+  border: 2px solid var(--carbon-black);
+  border-radius: 12px;
+  padding: 12px;
+  background: white;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 160px;
+}
+
+.workout-card.today {
+  border-color: var(--persian-blue);
+  box-shadow: 4px 4px 0px var(--persian-blue);
+}
+
+.workout-card.completed {
+  background: #f0fdf4;
+  border-color: var(--success-green);
+}
+
+.workout-card.rest {
+  background: #fff7ed;
+  border-color: var(--rust-brown);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-day {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--gray-400);
+}
+
+.card-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 4px;
+}
+
+.card-duration {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--carbon-black);
+  line-height: 1;
+}
+
+.duration-unit {
+  font-size: 14px;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.side-by-side {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.metrics-group {
+  flex: 1;
+}
+
+.metrics-label {
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  margin-bottom: 2px;
+}
+
+.metrics-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.planned-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--carbon-black);
+}
+
+.actual-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-400);
+}
+
+.actual-value.active {
+  color: var(--success-green);
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid var(--gray-200);
+  background: white;
+  color: var(--carbon-black);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-icon:hover {
+  background: var(--gray-200);
+}
+
+.btn-icon.complete {
+  color: var(--success-green);
+  border-color: var(--success-green);
+}
+
+.btn-icon.complete.active {
+  background: var(--success-green);
+  color: white;
+}
+
+/* Empty state */
+.workout-card.empty {
+  border-style: dashed;
+  opacity: 0.6;
+}
+

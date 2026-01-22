@@ -12,6 +12,11 @@ from services.excel_service import ExcelService
 from services.strava_service import StravaService
 from services.workout_plan_service import WorkoutPlanService
 from services.strava_activity_service import StravaActivityService
+from services.auth_service import (
+    require_auth, is_auth_enabled, validate_credentials,
+    create_session, delete_session, validate_session,
+    get_session_token_from_request
+)
 from database import get_db, init_db
 from logging_config import setup_logging, get_logger, log_api_request, log_strava_operation, log_error
 
@@ -22,7 +27,17 @@ setup_logging()
 logger = get_logger('app')
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True)
+
+# Configure CORS based on environment
+# In production, restrict to specific origins; in development, allow all
+cors_origins = os.getenv('CORS_ORIGINS', '*')
+if cors_origins and cors_origins != '*':
+    # Split comma-separated origins for production
+    origins = [origin.strip() for origin in cors_origins.split(',')]
+    CORS(app, origins=origins, supports_credentials=True)
+else:
+    # Development: allow all origins
+    CORS(app, supports_credentials=True)
 
 # Configure Flask secret key for sessions
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -67,8 +82,136 @@ def get_strava_session_token():
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
+    """Health check endpoint - always accessible, no auth required"""
     return jsonify({"status": "ok", "message": "Workout Coach API is running"})
+
+
+# ============================================================================
+# Authentication Endpoints
+# ============================================================================
+
+@app.route('/api/auth/login', methods=['POST'])
+def auth_login():
+    """
+    Login endpoint - validates credentials and returns session token.
+
+    Request body:
+        {
+            "username": "string",
+            "password": "string"
+        }
+
+    Returns:
+        {
+            "message": "Login successful",
+            "session_token": "string"
+        }
+    """
+    # If auth is not enabled, return success immediately
+    if not is_auth_enabled():
+        return jsonify({
+            "message": "Authentication not enabled",
+            "session_token": None,
+            "auth_enabled": False
+        })
+
+    data = request.json
+    if not data:
+        return jsonify({"error": "Request body required"}), 400
+
+    username = data.get('username', '')
+    password = data.get('password', '')
+
+    if not username or not password:
+        return jsonify({"error": "Username and password required"}), 400
+
+    if not validate_credentials(username, password):
+        logger.warning(f"Failed login attempt for user: {username}")
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    # Create session
+    session_token = create_session()
+    logger.info(f"User logged in: {username}")
+
+    response = jsonify({
+        "message": "Login successful",
+        "session_token": session_token,
+        "auth_enabled": True
+    })
+
+    # Also set cookie for convenience
+    response.set_cookie(
+        'auth_session',
+        session_token,
+        httponly=True,
+        secure=os.getenv('FLASK_ENV') == 'production',
+        samesite='Lax',
+        max_age=86400  # 24 hours
+    )
+
+    return response
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+def auth_logout():
+    """
+    Logout endpoint - invalidates the current session.
+
+    Returns:
+        {"message": "Logged out successfully"}
+    """
+    token = get_session_token_from_request()
+
+    if token:
+        delete_session(token)
+        logger.info("User logged out")
+
+    response = jsonify({"message": "Logged out successfully"})
+
+    # Clear the cookie
+    response.delete_cookie('auth_session')
+
+    return response
+
+
+@app.route('/api/auth/check', methods=['GET'])
+def auth_check():
+    """
+    Check if current session is valid.
+
+    Returns:
+        {
+            "authenticated": bool,
+            "auth_enabled": bool,
+            "message": "string"
+        }
+    """
+    auth_enabled = is_auth_enabled()
+
+    # If auth is not enabled, always return authenticated
+    if not auth_enabled:
+        return jsonify({
+            "authenticated": True,
+            "auth_enabled": False,
+            "message": "Authentication not enabled"
+        })
+
+    token = get_session_token_from_request()
+
+    if not token:
+        return jsonify({
+            "authenticated": False,
+            "auth_enabled": True,
+            "message": "No session token provided"
+        })
+
+    is_valid = validate_session(token)
+
+    return jsonify({
+        "authenticated": is_valid,
+        "auth_enabled": True,
+        "message": "Session valid" if is_valid else "Session invalid or expired"
+    })
 
 
 # ============================================================================
@@ -76,6 +219,7 @@ def health_check():
 # ============================================================================
 
 @app.route('/api/chat', methods=['POST'])
+@require_auth
 def chat():
     """Handle chat messages and generate workout plans"""
     log_api_request('POST', '/api/chat')
@@ -134,6 +278,7 @@ def chat():
 # ============================================================================
 
 @app.route('/api/workout-plans', methods=['GET'])
+@require_auth
 def get_all_workout_plans():
     """Get all workout plans"""
     try:
@@ -161,6 +306,7 @@ def get_all_workout_plans():
 
 
 @app.route('/api/workout-plans/active', methods=['GET'])
+@require_auth
 def get_active_workout_plan():
     """Get the currently active workout plan"""
     try:
@@ -189,6 +335,7 @@ def get_active_workout_plan():
 
 
 @app.route('/api/workout-plans/<plan_id>', methods=['GET'])
+@require_auth
 def get_workout_plan(plan_id):
     """Retrieve a specific workout plan by ID"""
     try:
@@ -217,6 +364,7 @@ def get_workout_plan(plan_id):
 
 
 @app.route('/api/workout-plans/<plan_id>/activate', methods=['POST'])
+@require_auth
 def activate_workout_plan(plan_id):
     """Set a workout plan as active (deactivates all others)"""
     try:
@@ -245,6 +393,7 @@ def activate_workout_plan(plan_id):
 
 
 @app.route('/api/workout-plans/<plan_id>', methods=['DELETE'])
+@require_auth
 def delete_workout_plan(plan_id):
     """Delete a workout plan (cannot delete active plan)"""
     try:
@@ -273,6 +422,7 @@ def delete_workout_plan(plan_id):
 
 
 @app.route('/api/export/excel/<plan_id>', methods=['GET'])
+@require_auth
 def export_excel(plan_id):
     """Export workout plan to Excel"""
     try:
@@ -312,6 +462,7 @@ def export_excel(plan_id):
 # ============================================================================
 
 @app.route('/api/workouts/week', methods=['GET'])
+@require_auth
 def get_workouts_current_week():
     """Get workouts for the current calendar week"""
     try:
@@ -334,6 +485,7 @@ def get_workouts_current_week():
 
 
 @app.route('/api/workouts/week/<int:week_offset>', methods=['GET'])
+@require_auth
 def get_workouts_week_offset(week_offset):
     """Get workouts for a specific week by offset (0=current, -1=last, +1=next)"""
     try:
@@ -357,6 +509,7 @@ def get_workouts_week_offset(week_offset):
 
 
 @app.route('/api/workouts/month/<int:year>/<int:month>', methods=['GET'])
+@require_auth
 def get_workouts_month(year, month):
     """Get workouts for a specific calendar month"""
     try:
@@ -382,6 +535,7 @@ def get_workouts_month(year, month):
 
 
 @app.route('/api/workouts/<workout_id>/complete', methods=['PUT'])
+@require_auth
 def toggle_workout_completion(workout_id):
     """Toggle workout completion status"""
     try:
@@ -405,6 +559,7 @@ def toggle_workout_completion(workout_id):
 
 
 @app.route('/api/workouts/progress', methods=['GET'])
+@require_auth
 def get_week_progress():
     """Get progress summary for the current week"""
     try:
@@ -429,6 +584,7 @@ def get_week_progress():
 # ============================================================================
 
 @app.route('/api/workouts/<workout_id>', methods=['PUT'])
+@require_auth
 def update_workout(workout_id):
     """Update workout details (partial updates supported)"""
     try:
@@ -480,6 +636,7 @@ def update_workout(workout_id):
 # ============================================================================
 
 @app.route('/api/strava/auth', methods=['GET'])
+@require_auth
 def strava_auth():
     """Initiate Strava OAuth flow"""
     log_strava_operation("auth_init", "Starting OAuth flow")
@@ -552,6 +709,9 @@ def strava_callback():
         finally:
             db.close()
 
+        # Get frontend URL from environment (default to localhost for development)
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
         # Return HTML that stores the session token securely
         return f"""
         <html>
@@ -574,7 +734,7 @@ def strava_callback():
                     }} else {{
                         // Store session token (not the actual access token)
                         localStorage.setItem('strava_session_token', '{session_token}');
-                        window.location.href = 'http://localhost:3000?strava_connected=true';
+                        window.location.href = '{frontend_url}?strava_connected=true';
                     }}
                 </script>
             </body>
@@ -587,6 +747,7 @@ def strava_callback():
 
 
 @app.route('/api/strava/validate', methods=['GET'])
+@require_auth
 def validate_strava_connection():
     """Validate Strava connection and return athlete info"""
     try:
@@ -629,6 +790,7 @@ def validate_strava_connection():
 
 
 @app.route('/api/strava/logout', methods=['POST'])
+@require_auth
 def strava_logout():
     """Log out from Strava (delete server-side session)"""
     try:
@@ -651,6 +813,7 @@ def strava_logout():
 
 
 @app.route('/api/strava/activities', methods=['GET'])
+@require_auth
 def get_strava_activities():
     """Fetch and import activities from Strava"""
     try:
@@ -689,6 +852,7 @@ def get_strava_activities():
 
 
 @app.route('/api/strava/activities/stored', methods=['GET'])
+@require_auth
 def get_stored_activities():
     """Get activities stored in the database (no Strava API call)"""
     try:
@@ -714,6 +878,7 @@ def get_stored_activities():
 
 
 @app.route('/api/strava/activities/<activity_id>/link', methods=['POST'])
+@require_auth
 def link_activity_to_workout(activity_id):
     """Link a Strava activity to a planned workout"""
     try:
@@ -746,6 +911,7 @@ def link_activity_to_workout(activity_id):
 
 
 @app.route('/api/strava/activities/<activity_id>/unlink', methods=['POST'])
+@require_auth
 def unlink_activity(activity_id):
     """Unlink a Strava activity from its workout"""
     try:
@@ -770,6 +936,7 @@ def unlink_activity(activity_id):
 
 
 @app.route('/api/strava/import', methods=['POST'])
+@require_auth
 def import_strava_activities():
     """Import selected activities (legacy endpoint - now auto-imports on fetch)"""
     try:

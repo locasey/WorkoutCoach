@@ -5,7 +5,9 @@
       "Bash(venv/Scripts/python:*)",
       "Bash(npm run dev:*)",
       "Bash(\"venv\\\\Scripts\\\\alembic.exe\" upgrade head)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "mcp__linear-server__create_issue",
+      "mcp__linear-server__list_teams"
     ]
   }
 }

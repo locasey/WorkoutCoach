@@ -1,6 +1,6 @@
 # LOC-7: Deploy Application to Cloud Server
 
-**Overall Progress:** `0%`
+**Overall Progress:** `55%`
 
 ## TLDR
 
@@ -18,45 +18,46 @@ Deploy the Workout Coach application to AWS Lightsail so it's accessible at `wor
 
 ## Tasks
 
-- [ ] **Step 1: Add Simple Authentication to Backend**
-  - [ ] Create auth middleware that checks for valid session
-  - [ ] Add login endpoint (`POST /api/auth/login`)
-  - [ ] Add logout endpoint (`POST /api/auth/logout`)
-  - [ ] Add auth check endpoint (`GET /api/auth/check`)
-  - [ ] Protect all existing API routes (except health check)
-  - [ ] Add `AUTH_USERNAME` and `AUTH_PASSWORD` to `env.template`
+- [x] **Step 1: Add Simple Authentication to Backend** ✅
+  - [x] Create auth middleware that checks for valid session
+  - [x] Add login endpoint (`POST /api/auth/login`)
+  - [x] Add logout endpoint (`POST /api/auth/logout`)
+  - [x] Add auth check endpoint (`GET /api/auth/check`)
+  - [x] Protect all existing API routes (except health check)
+  - [x] Add `AUTH_USERNAME` and `AUTH_PASSWORD` to `env.template`
 
-- [ ] **Step 2: Add Login UI to Frontend**
-  - [ ] Create `LoginPage.jsx` component with username/password form
-  - [ ] Add auth state management in `App.jsx`
-  - [ ] Redirect to login if not authenticated
-  - [ ] Store session token in localStorage
-  - [ ] Add logout button to main UI
+- [x] **Step 2: Add Login UI to Frontend** ✅
+  - [x] Create `LoginPage.jsx` component with username/password form
+  - [x] Add auth state management in `App.jsx`
+  - [x] Redirect to login if not authenticated
+  - [x] Store session token in localStorage
+  - [x] Add logout button to main UI
 
-- [ ] **Step 3: Make URLs Environment-Driven**
-  - [ ] Add `FRONTEND_URL` env var for OAuth callback redirect
-  - [ ] Update `backend/app.py` line 577 to use `FRONTEND_URL`
-  - [ ] Add `CORS_ORIGINS` env var for production CORS
-  - [ ] Update CORS config to use `CORS_ORIGINS` in production
-  - [ ] Add `VITE_API_URL` for frontend production builds
-  - [ ] Update frontend to use `VITE_API_URL` when set
+- [x] **Step 3: Make URLs Environment-Driven** ✅
+  - [x] Add `FRONTEND_URL` env var for OAuth callback redirect
+  - [x] Update `backend/app.py` line 577 to use `FRONTEND_URL`
+  - [x] Add `CORS_ORIGINS` env var for production CORS
+  - [x] Update CORS config to use `CORS_ORIGINS` in production
+  - [x] Add `VITE_API_URL` for frontend production builds
+  - [x] Update frontend to use `VITE_API_URL` when set
 
-- [ ] **Step 4: Create Backend Dockerfile**
-  - [ ] Create `backend/Dockerfile` with Python 3.11 base
-  - [ ] Install dependencies from `requirements.txt`
-  - [ ] Use gunicorn for production server
-  - [ ] Add `gunicorn` to `requirements.txt`
-  - [ ] Expose port 5000
+- [x] **Step 4: Create Backend Dockerfile** ✅
+  - [x] Create `backend/Dockerfile` with Python 3.11 base
+  - [x] Install dependencies from `requirements.txt`
+  - [x] Use gunicorn for production server
+  - [x] Add `gunicorn` to `requirements.txt`
+  - [x] Expose port 5000
 
-- [ ] **Step 5: Create Frontend Production Build**
-  - [ ] Update `vite.config.js` to handle production API URL
-  - [ ] Test `npm run build` creates working static files
-  - [ ] Document build command for deployment
+- [x] **Step 5: Create Frontend Production Build** ✅
+  - [x] Update `vite.config.js` to handle production API URL
+  - [x] Create Frontend Dockerfile with nginx
+  - [x] Document build command for deployment
 
-- [ ] **Step 6: Create Production Environment Template**
-  - [ ] Create `backend/env.production.template` with all required vars
-  - [ ] Document each variable's purpose
-  - [ ] Include placeholder values
+- [x] **Step 6: Create Production Environment Template** ✅
+  - [x] Create `backend/env.production.template` with all required vars
+  - [x] Document each variable's purpose
+  - [x] Include placeholder values
+  - [x] Create `docker-compose.production.yml` for local testing
 
 - [ ] **Step 7: Set Up AWS Lightsail**
   - [ ] Create AWS account (if needed)

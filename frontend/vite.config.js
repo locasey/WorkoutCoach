@@ -11,6 +11,12 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  // Define environment variables prefix
+  // VITE_API_URL will be available as import.meta.env.VITE_API_URL
+  define: {
+    // Make process.env available for compatibility
+    'process.env': {}
   }
 })
 

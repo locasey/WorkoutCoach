@@ -3,6 +3,7 @@ Authentication Service for Workout Coach
 
 Provides simple username/password authentication with session management.
 Credentials are stored in environment variables for single-user MVP.
+Sessions are stored persistently in PostgreSQL database.
 """
 
 import os
@@ -11,11 +12,8 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from flask import request, jsonify, g
-
-
-# In-memory session store for MVP (single instance)
-# Production would use Redis or database-backed sessions
-_sessions = {}
+from database import get_db
+from models.auth_session import AuthSession
 
 # Session expiration time (24 hours)
 SESSION_EXPIRY_HOURS = 24
@@ -83,7 +81,7 @@ def validate_credentials(username: str, password: str) -> bool:
 
 def create_session() -> str:
     """
-    Create a new session token.
+    Create a new session token and store it in the database.
 
     Returns:
         str: Generated session token
@@ -91,17 +89,27 @@ def create_session() -> str:
     token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=SESSION_EXPIRY_HOURS)
 
-    _sessions[token] = {
-        'created_at': datetime.now(timezone.utc),
-        'expires_at': expires_at
-    }
-
-    return token
+    db = next(get_db())
+    try:
+        session = AuthSession(
+            session_token=token,
+            expires_at=expires_at,
+            user_id=None  # Nullable for MVP (single user)
+        )
+        db.add(session)
+        db.commit()
+        return token
+    except Exception as e:
+        db.rollback()
+        raise  # Re-raise to be handled by caller
+    finally:
+        db.close()
 
 
 def validate_session(token: str) -> bool:
     """
-    Validate a session token.
+    Validate a session token from the database.
+    Also performs on-demand cleanup of expired sessions.
 
     Args:
         token: Session token to validate
@@ -109,23 +117,40 @@ def validate_session(token: str) -> bool:
     Returns:
         bool: True if session is valid and not expired
     """
-    if not token or token not in _sessions:
+    if not token:
         return False
 
-    session = _sessions[token]
-    now = datetime.now(timezone.utc)
+    db = next(get_db())
+    try:
+        now = datetime.now(timezone.utc)
+        
+        # Find session by token
+        session = db.query(AuthSession).filter(
+            AuthSession.session_token == token
+        ).first()
 
-    if now > session['expires_at']:
-        # Clean up expired session
-        del _sessions[token]
+        if not session:
+            return False
+
+        # Check if expired
+        if now >= session.expires_at:
+            # Clean up expired session (on-demand cleanup)
+            db.delete(session)
+            db.commit()
+            return False
+
+        return True
+    except Exception:
+        # Fail closed: if DB error, reject session
+        db.rollback()
         return False
-
-    return True
+    finally:
+        db.close()
 
 
 def delete_session(token: str) -> bool:
     """
-    Delete a session (logout).
+    Delete a session from the database (logout).
 
     Args:
         token: Session token to delete
@@ -133,10 +158,25 @@ def delete_session(token: str) -> bool:
     Returns:
         bool: True if session was deleted
     """
-    if token in _sessions:
-        del _sessions[token]
-        return True
-    return False
+    if not token:
+        return False
+
+    db = next(get_db())
+    try:
+        session = db.query(AuthSession).filter(
+            AuthSession.session_token == token
+        ).first()
+
+        if session:
+            db.delete(session)
+            db.commit()
+            return True
+        return False
+    except Exception:
+        db.rollback()
+        return False
+    finally:
+        db.close()
 
 
 def get_session_token_from_request():
@@ -208,14 +248,30 @@ def require_auth(f):
 
 def cleanup_expired_sessions():
     """
-    Remove all expired sessions from memory.
-    Call periodically to prevent memory buildup.
+    Remove all expired sessions from the database.
+    Call periodically to prevent database buildup.
+    Uses indexed query on expires_at for efficiency.
+
+    Returns:
+        int: Number of expired sessions deleted
     """
-    now = datetime.now(timezone.utc)
-    expired = [token for token, session in _sessions.items()
-               if now > session['expires_at']]
+    db = next(get_db())
+    try:
+        now = datetime.now(timezone.utc)
+        
+        # Query expired sessions using indexed expires_at column
+        expired_sessions = db.query(AuthSession).filter(
+            AuthSession.expires_at <= now
+        ).all()
 
-    for token in expired:
-        del _sessions[token]
-
-    return len(expired)
+        count = len(expired_sessions)
+        for session in expired_sessions:
+            db.delete(session)
+        
+        db.commit()
+        return count
+    except Exception:
+        db.rollback()
+        return 0
+    finally:
+        db.close()

@@ -1,6 +1,6 @@
 # LOC-7: Deploy Application to Cloud Server
 
-**Overall Progress:** `55%`
+**Overall Progress:** `60%`
 
 ## TLDR
 
@@ -11,10 +11,11 @@ Deploy the Workout Coach application to AWS Lightsail so it's accessible at `wor
 - **Platform**: AWS Lightsail - 3 months free, simple container hosting, good AWS exposure
 - **Domain**: `workoutcoach.liamocasey.com` - subdomain (free), easier SSL than path-based
 - **Database**: Neon PostgreSQL - already configured, no changes needed
-- **Architecture**: Separate services - backend container + frontend static files
+- **Architecture**: Separate services - backend container + frontend static files (S3)
 - **Authentication**: Simple env credentials - username/password in environment variables
 - **CORS**: Restricted to production domain in production only
 - **Strava OAuth**: Keep localhost for now - LOC-10 handles production switch later
+- **CI/CD**: GitHub Actions - builds Docker remotely (no local Docker needed)
 
 ## Tasks
 
@@ -59,32 +60,33 @@ Deploy the Workout Coach application to AWS Lightsail so it's accessible at `wor
   - [x] Include placeholder values
   - [x] Create `docker-compose.production.yml` for local testing
 
-- [ ] **Step 7: Set Up AWS Lightsail**
-  - [ ] Create AWS account (if needed)
+- [x] **Step 7: Create GitHub Actions Workflow** ✅
+  - [x] Create `.github/workflows/deploy.yml`
+  - [x] Configure backend build and push to Lightsail
+  - [x] Configure frontend build and deploy to S3
+  - [x] Add automatic deployment on push to main
+
+- [ ] **Step 8: Set Up AWS Infrastructure** 📋 [See CLI Guide](LOC-7_STEP7_CLI_GUIDE.md#step-7-set-up-aws-lightsail-backend)
+  - [ ] Install and configure AWS CLI locally
+  - [ ] Create IAM user with Lightsail + S3 permissions
   - [ ] Create Lightsail container service
-  - [ ] Push backend Docker image to Lightsail
-  - [ ] Configure environment variables in Lightsail
-  - [ ] Deploy backend container
-  - [ ] Verify backend health endpoint works
+  - [ ] Create S3 bucket for frontend
 
-- [ ] **Step 8: Deploy Frontend Static Files**
-  - [ ] Build frontend with production API URL
-  - [ ] Create Lightsail static site (or use S3 + CloudFront)
-  - [ ] Upload built files
-  - [ ] Verify frontend loads
+- [ ] **Step 9: Configure GitHub Secrets** 📋 [See CLI Guide](LOC-7_STEP7_CLI_GUIDE.md#step-9-configure-github-secrets)
+  - [ ] Add AWS credentials to GitHub secrets
+  - [ ] Add all environment variables as secrets
+  - [ ] Push to main to trigger first deployment
 
-- [ ] **Step 9: Configure DNS & SSL**
-  - [ ] Add CNAME record for `workoutcoach.liamocasey.com` pointing to Lightsail
-  - [ ] Enable SSL certificate in Lightsail
+- [ ] **Step 10: Configure DNS & SSL** 📋 [See CLI Guide](LOC-7_STEP7_CLI_GUIDE.md#step-11-configure-dns--ssl)
+  - [ ] Create CloudFront distribution for SSL
+  - [ ] Add CNAME record for `workoutcoach.liamocasey.com`
   - [ ] Verify HTTPS works
-  - [ ] Test full authentication flow
 
-- [ ] **Step 10: Run Database Migrations**
-  - [ ] Verify Neon DATABASE_URL is set in Lightsail
+- [ ] **Step 11: Run Database Migrations** 📋 [See CLI Guide](LOC-7_STEP7_CLI_GUIDE.md#step-12-run-database-migrations)
   - [ ] Run Alembic migrations against production database
   - [ ] Verify tables exist and app connects
 
-- [ ] **Step 11: Final Testing**
+- [ ] **Step 12: Final Testing** 📋 [See CLI Guide](LOC-7_STEP7_CLI_GUIDE.md#step-13-final-testing)
   - [ ] Test login from desktop browser
   - [ ] Test login from mobile phone
   - [ ] Test workout plan generation
@@ -130,6 +132,9 @@ MAX_WORKOUT_PLANS=5
 ## Notes
 
 - Strava integration will only work locally until LOC-10 is completed
-- Frontend needs to be rebuilt whenever `VITE_API_URL` changes
+- Frontend is rebuilt automatically on each push to main
 - Database migrations should be run before first deployment
+- **No local Docker required** - GitHub Actions builds images remotely
+- **CLI Guide**: Full step-by-step AWS commands in [LOC-7_STEP7_CLI_GUIDE.md](LOC-7_STEP7_CLI_GUIDE.md)
+- **GitHub Workflow**: [.github/workflows/deploy.yml](../.github/workflows/deploy.yml)
 

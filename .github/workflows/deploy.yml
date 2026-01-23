@@ -1,0 +1,207 @@
+# GitHub Actions workflow for deploying Workout Coach to AWS Lightsail
+#
+# This workflow:
+# 1. Builds the backend Docker image (on GitHub's servers, not locally)
+# 2. Pushes it to AWS Lightsail container registry
+# 3. Deploys the container with environment variables
+# 4. Builds and deploys frontend to S3
+#
+# Triggers on push to main branch, or manual dispatch from GitHub UI
+
+name: Deploy to AWS Lightsail
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+env:
+  AWS_REGION: us-east-1
+  BACKEND_SERVICE_NAME: workout-coach-backend
+  FRONTEND_BUCKET: workoutcoach-frontend
+
+jobs:
+  # ============================================================================
+  # Backend Deployment
+  # ============================================================================
+  deploy-backend:
+    name: Build & Deploy Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      # ----------------------------------------------------------------------
+      # Setup
+      # ----------------------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ----------------------------------------------------------------------
+      # Build Docker Image
+      # ----------------------------------------------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend Docker image
+        run: |
+          cd backend
+          docker build -t workout-coach-backend:latest .
+
+      # ----------------------------------------------------------------------
+      # Push to Lightsail
+      # ----------------------------------------------------------------------
+      - name: Install Lightsail CLI plugin
+        run: |
+          curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "/usr/local/bin/lightsailctl"
+          sudo chmod +x /usr/local/bin/lightsailctl
+
+      - name: Push image to Lightsail
+        id: push-image
+        run: |
+          # Push image and capture the full image name returned
+          OUTPUT=$(aws lightsail push-container-image \
+            --service-name ${{ env.BACKEND_SERVICE_NAME }} \
+            --label backend-${{ github.sha }} \
+            --image workout-coach-backend:latest \
+            --region ${{ env.AWS_REGION }} 2>&1)
+
+          echo "$OUTPUT"
+
+          # Extract the image name (format: :service-name.label.X)
+          IMAGE_NAME=$(echo "$OUTPUT" | grep -oP ':\S+\.\d+' | head -1)
+          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "Pushed image: $IMAGE_NAME"
+
+      # ----------------------------------------------------------------------
+      # Deploy Container
+      # ----------------------------------------------------------------------
+      - name: Create deployment
+        run: |
+          # Create deployment configuration
+          cat > deployment.json << 'EOF'
+          {
+            "containers": {
+              "backend": {
+                "image": "${{ steps.push-image.outputs.image_name }}",
+                "ports": {
+                  "5000": "HTTP"
+                },
+                "environment": {
+                  "DATABASE_URL": "${{ secrets.DATABASE_URL }}",
+                  "SECRET_KEY": "${{ secrets.SECRET_KEY }}",
+                  "FLASK_ENV": "production",
+                  "AUTH_USERNAME": "${{ secrets.AUTH_USERNAME }}",
+                  "AUTH_PASSWORD": "${{ secrets.AUTH_PASSWORD }}",
+                  "LLM_PROVIDER": "${{ secrets.LLM_PROVIDER }}",
+                  "GEMINI_API_KEY": "${{ secrets.GEMINI_API_KEY }}",
+                  "STRAVA_CLIENT_ID": "${{ secrets.STRAVA_CLIENT_ID }}",
+                  "STRAVA_CLIENT_SECRET": "${{ secrets.STRAVA_CLIENT_SECRET }}",
+                  "STRAVA_REDIRECT_URI": "http://localhost:5000/api/strava/callback",
+                  "FRONTEND_URL": "${{ secrets.FRONTEND_URL }}",
+                  "CORS_ORIGINS": "${{ secrets.CORS_ORIGINS }}",
+                  "MAX_WORKOUT_PLANS": "5"
+                }
+              }
+            },
+            "publicEndpoint": {
+              "containerName": "backend",
+              "containerPort": 5000,
+              "healthCheck": {
+                "path": "/api/health",
+                "intervalSeconds": 30,
+                "timeoutSeconds": 10
+              }
+            }
+          }
+          EOF
+
+          # Deploy
+          aws lightsail create-container-service-deployment \
+            --service-name ${{ env.BACKEND_SERVICE_NAME }} \
+            --cli-input-json file://deployment.json \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for deployment to complete..."
+          for i in {1..30}; do
+            STATUS=$(aws lightsail get-container-services \
+              --service-name ${{ env.BACKEND_SERVICE_NAME }} \
+              --query 'containerServices[0].state' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+
+            echo "Attempt $i: Status = $STATUS"
+
+            if [ "$STATUS" = "RUNNING" ]; then
+              echo "Deployment successful!"
+              exit 0
+            elif [ "$STATUS" = "FAILED" ]; then
+              echo "Deployment failed!"
+              exit 1
+            fi
+
+            sleep 20
+          done
+
+          echo "Timeout waiting for deployment"
+          exit 1
+
+  # ============================================================================
+  # Frontend Deployment
+  # ============================================================================
+  deploy-frontend:
+    name: Build & Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: deploy-backend  # Wait for backend to be deployed first
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci --legacy-peer-deps
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          VITE_API_URL=${{ secrets.BACKEND_URL }} npm run build
+        env:
+          VITE_API_URL: ${{ secrets.BACKEND_URL }}
+
+      - name: Deploy to S3
+        run: |
+          aws s3 sync frontend/dist/ s3://${{ env.FRONTEND_BUCKET }} --delete
+
+      - name: Invalidate CloudFront cache (if configured)
+        continue-on-error: true  # Don't fail if CloudFront not set up yet
+        run: |
+          if [ -n "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" ]; then
+            aws cloudfront create-invalidation \
+              --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+              --paths "/*"
+          else
+            echo "No CloudFront distribution configured, skipping cache invalidation"
+          fi

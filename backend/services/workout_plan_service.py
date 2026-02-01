@@ -73,12 +73,12 @@ class WorkoutPlanService:
     def create_workout_plan(db: Session, plan_data: dict, user_id: int = None) -> WorkoutPlan:
         """
         Create a new workout plan from LLM-generated plan data.
-        
+
         Args:
             db: Database session
             plan_data: Dictionary containing workout plan data from LLM
             user_id: Optional user ID (nullable for MVP)
-        
+
         Returns:
             Created WorkoutPlan object
         """
@@ -86,7 +86,7 @@ class WorkoutPlanService:
         goal = plan_data.get('goal', '')
         duration_weeks = plan_data.get('duration_weeks', 0)
         user_request = plan_data.get('user_request', '')
-        
+
         # Calculate start_date (default to today if not provided)
         start_date = date.today()
         if 'start_date' in plan_data and plan_data['start_date']:
@@ -94,10 +94,14 @@ class WorkoutPlanService:
                 start_date = datetime.fromisoformat(plan_data['start_date']).date()
             else:
                 start_date = plan_data['start_date']
-        
+
+        # Auto-generate plan name from goal
+        plan_name = WorkoutPlanService.generate_plan_name(goal)
+
         # Create workout plan
         workout_plan = WorkoutPlan(
             user_id=user_id,
+            name=plan_name,
             goal=goal,
             duration_weeks=duration_weeks,
             start_date=start_date,
@@ -463,37 +467,103 @@ class WorkoutPlanService:
         }
     
     @staticmethod
+    def generate_plan_name(goal: str, created_at: datetime = None) -> str:
+        """
+        Generate a default name for a workout plan.
+
+        Uses first 50 chars of goal if available, otherwise generates
+        a date-based name like "Plan - Jan 2026".
+
+        Args:
+            goal: The workout plan goal text
+            created_at: Plan creation timestamp (defaults to now)
+
+        Returns:
+            Generated plan name string
+        """
+        if goal and goal.strip():
+            # Truncate goal to 50 chars, add ellipsis if needed
+            truncated = goal.strip()[:50]
+            if len(goal.strip()) > 50:
+                truncated = truncated.rstrip() + "..."
+            return truncated
+
+        # Fallback: date-based name
+        if created_at is None:
+            created_at = datetime.now()
+        return f"Plan - {created_at.strftime('%b %Y')}"
+
+    @staticmethod
+    def update_workout_plan_name(db: Session, plan_id: uuid.UUID, name: str, user_id: int = None) -> WorkoutPlan:
+        """
+        Update the name of a workout plan.
+
+        Args:
+            db: Database session
+            plan_id: ID of the plan to update
+            name: New name for the plan (max 255 chars)
+            user_id: Optional user ID filter
+
+        Returns:
+            Updated WorkoutPlan object
+
+        Raises:
+            ValueError: If plan not found or name is invalid
+        """
+        plan = db.query(WorkoutPlan).filter(WorkoutPlan.id == plan_id).first()
+
+        if not plan:
+            raise ValueError(f"Workout plan with id {plan_id} not found")
+
+        # Validate name
+        if name is None or not name.strip():
+            raise ValueError("Plan name cannot be empty")
+
+        if len(name) > 255:
+            raise ValueError("Plan name cannot exceed 255 characters")
+
+        # Check user_id if provided
+        if user_id is not None and plan.user_id != user_id:
+            raise ValueError(f"Workout plan with id {plan_id} not found")
+
+        plan.name = name.strip()
+        db.commit()
+        db.refresh(plan)
+
+        return plan
+
+    @staticmethod
     def delete_workout_plan(db: Session, plan_id: uuid.UUID, user_id: int = None) -> bool:
         """
         Delete a workout plan. Cannot delete active plan.
-        
+
         Args:
             db: Database session
             plan_id: ID of plan to delete
             user_id: Optional user ID filter
-            
+
         Returns:
             True if deleted, False if not found
-            
+
         Raises:
             ValueError: If trying to delete active plan
         """
         plan = db.query(WorkoutPlan).filter(WorkoutPlan.id == plan_id).first()
-        
+
         if not plan:
             return False
-        
+
         # Check user_id if provided
         if user_id is not None and plan.user_id != user_id:
             return False
-        
+
         # Cannot delete active plan
         if plan.is_active:
             raise ValueError("Cannot delete active workout plan. Please deactivate it first.")
-        
+
         # Delete plan (workouts will be cascade deleted)
         db.delete(plan)
         db.commit()
-        
+
         return True
 

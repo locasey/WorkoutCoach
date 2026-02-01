@@ -10,10 +10,17 @@ from database import Base
 
 
 class WorkoutPlan(Base):
+    """
+    Represents a workout training plan.
+
+    The `name` field provides a user-friendly identifier for the plan.
+    It can be auto-generated from the goal on creation or edited by the user.
+    """
     __tablename__ = 'workout_plans'
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(Integer, nullable=True)  # Nullable for MVP (single user)
+    name = Column(String(255), nullable=True)  # User-editable plan name (auto-set on creation)
     goal = Column(Text, nullable=False)
     duration_weeks = Column(Integer, nullable=False)
     start_date = Column(Date, nullable=True)  # When the plan starts
@@ -26,10 +33,11 @@ class WorkoutPlan(Base):
     workouts = relationship("Workout", back_populates="workout_plan", cascade="all, delete-orphan")
     
     def to_dict(self):
-        """Convert model to dictionary"""
+        """Convert model to dictionary for JSON serialization."""
         return {
             'id': str(self.id),
             'user_id': self.user_id,
+            'name': self.name,
             'goal': self.goal,
             'duration_weeks': self.duration_weeks,
             'start_date': self.start_date.isoformat() if self.start_date else None,

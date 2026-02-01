@@ -392,6 +392,60 @@ def activate_workout_plan(plan_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/workout-plans/<plan_id>', methods=['PATCH'])
+@require_auth
+def update_workout_plan(plan_id):
+    """
+    Update workout plan details (currently supports name only).
+
+    Request body:
+        {
+            "name": "New Plan Name"
+        }
+
+    Returns:
+        Updated plan object
+    """
+    try:
+        data = request.json
+        if data is None:
+            return jsonify({"error": "Request body is required"}), 400
+
+        db = next(get_db())
+        try:
+            plan_uuid = uuid.UUID(plan_id)
+
+            # Currently only name is editable
+            if 'name' in data:
+                plan = WorkoutPlanService.update_workout_plan_name(
+                    db, plan_uuid, data['name'], user_id=None
+                )
+            else:
+                # If no fields to update, just return the current plan
+                plan = WorkoutPlanService.get_workout_plan(db, plan_uuid)
+                if not plan:
+                    return jsonify({"error": "Workout plan not found"}), 404
+
+            plan_dict = plan.to_dict()
+            plan_dict['workout_count'] = len(plan.workouts)
+
+            logger.info(f"Updated workout plan: {plan_id}")
+            return jsonify({
+                "plan": plan_dict,
+                "message": "Workout plan updated successfully"
+            })
+        except ValueError as e:
+            error_msg = str(e)
+            if "not found" in error_msg.lower():
+                return jsonify({"error": error_msg}), 404
+            return jsonify({"error": error_msg}), 400
+        finally:
+            db.close()
+    except Exception as e:
+        log_error("Error updating workout plan", e)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/workout-plans/<plan_id>', methods=['DELETE'])
 @require_auth
 def delete_workout_plan(plan_id):

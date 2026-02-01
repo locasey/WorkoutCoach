@@ -1,10 +1,14 @@
 # GitHub Actions workflow for deploying Workout Coach to AWS Lightsail
 #
 # This workflow:
-# 1. Builds the backend Docker image (on GitHub's servers, not locally)
-# 2. Pushes it to AWS Lightsail container registry
-# 3. Deploys the container with environment variables
-# 4. Builds and deploys frontend to S3
+# 1. Runs Alembic database migrations against production Neon PostgreSQL
+# 2. Builds the backend Docker image (on GitHub's servers, not locally)
+# 3. Pushes it to AWS Lightsail container registry
+# 4. Deploys the container with environment variables
+# 5. Builds and deploys frontend to S3
+#
+# Job Dependencies:
+#   run-migrations → deploy-backend → deploy-frontend
 #
 # Triggers on push to main branch, or manual dispatch from GitHub UI
 
@@ -22,11 +26,55 @@ env:
 
 jobs:
   # ============================================================================
+  # Database Migrations
+  # ============================================================================
+  run-migrations:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Run Alembic migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cd backend
+          echo "Running database migrations against production..."
+          alembic upgrade head
+          echo "Migrations completed successfully!"
+
+      - name: Verify migration status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cd backend
+          echo "Current migration head:"
+          alembic current
+          echo ""
+          echo "Migration history:"
+          alembic history
+
+  # ============================================================================
   # Backend Deployment
   # ============================================================================
   deploy-backend:
     name: Build & Deploy Backend
     runs-on: ubuntu-latest
+    needs: run-migrations  # Ensure migrations run before deployment
 
     steps:
       # ----------------------------------------------------------------------

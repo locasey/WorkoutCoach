@@ -123,6 +123,59 @@ function App() {
               <span>Sign Out</span>
             </button>
           </div>
+          {/* Desktop nav: horizontal tabs below title; visible only at ≥769px */}
+          <nav className="desktop-nav hidden md:flex" role="tablist" aria-label="Main navigation">
+            <button
+              id="desktop-tab-week"
+              role="tab"
+              aria-selected={activeTab === 'week'}
+              className={activeTab === 'week' ? 'active' : ''}
+              onClick={() => setActiveTab('week')}
+            >
+              <LayoutGrid className="w-5 h-5" aria-hidden />
+              <span>Week</span>
+            </button>
+            <button
+              id="desktop-tab-month"
+              role="tab"
+              aria-selected={activeTab === 'month'}
+              className={activeTab === 'month' ? 'active' : ''}
+              onClick={() => setActiveTab('month')}
+            >
+              <Calendar className="w-5 h-5" aria-hidden />
+              <span>Month</span>
+            </button>
+            <button
+              id="desktop-tab-chat"
+              role="tab"
+              aria-selected={activeTab === 'chat'}
+              className={activeTab === 'chat' ? 'active' : ''}
+              onClick={() => setActiveTab('chat')}
+            >
+              <MessageSquare className="w-5 h-5" aria-hidden />
+              <span>Coach</span>
+            </button>
+            <button
+              id="desktop-tab-strava"
+              role="tab"
+              aria-selected={activeTab === 'strava'}
+              className={activeTab === 'strava' ? 'active' : ''}
+              onClick={() => setActiveTab('strava')}
+            >
+              <Activity className="w-5 h-5" aria-hidden />
+              <span>Strava</span>
+            </button>
+            <button
+              id="desktop-tab-plans"
+              role="tab"
+              aria-selected={activeTab === 'plans'}
+              className={activeTab === 'plans' ? 'active' : ''}
+              onClick={() => setActiveTab('plans')}
+            >
+              <Settings className="w-5 h-5" aria-hidden />
+              <span>Settings</span>
+            </button>
+          </nav>
         </header>
 
         <main className="app-main" role="tabpanel" aria-labelledby={`tab-${activeTab}`}>

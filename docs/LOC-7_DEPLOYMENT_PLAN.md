@@ -1,6 +1,6 @@
 # LOC-7: Deploy Application to Cloud Server
 
-**Overall Progress:** `60%`
+**Overall Progress:** `95%`
 
 ## TLDR
 
@@ -66,25 +66,30 @@ Deploy the Workout Coach application to AWS Lightsail so it's accessible at `wor
   - [x] Configure frontend build and deploy to S3
   - [x] Add automatic deployment on push to main
 
-- [ ] **Step 8: Set Up AWS Infrastructure** 📋 [See CLI Guide](LOC-7_STEP7_CLI_GUIDE.md#step-7-set-up-aws-lightsail-backend)
-  - [ ] Install and configure AWS CLI locally
-  - [ ] Create IAM user with Lightsail + S3 permissions
-  - [ ] Create Lightsail container service
-  - [ ] Create S3 bucket for frontend
+- [x] **Step 8: Set Up AWS Infrastructure** ✅
+  - [x] Install and configure AWS CLI locally
+  - [x] Create IAM user with Lightsail + S3 permissions
+  - [x] Create Lightsail container service
+  - [x] Create S3 bucket for frontend
 
-- [ ] **Step 9: Configure GitHub Secrets** 📋 [See CLI Guide](LOC-7_STEP7_CLI_GUIDE.md#step-9-configure-github-secrets)
-  - [ ] Add AWS credentials to GitHub secrets
-  - [ ] Add all environment variables as secrets
-  - [ ] Push to main to trigger first deployment
+- [x] **Step 9: Configure GitHub Secrets** ✅
+  - [x] Add AWS credentials to GitHub secrets
+  - [x] Add all environment variables as secrets
+  - [x] Push to main to trigger first deployment
 
-- [ ] **Step 10: Configure DNS & SSL** 📋 [See CLI Guide](LOC-7_STEP7_CLI_GUIDE.md#step-11-configure-dns--ssl)
-  - [ ] Create CloudFront distribution for SSL
-  - [ ] Add CNAME record for `workoutcoach.liamocasey.com`
-  - [ ] Verify HTTPS works
+- [x] **Step 10: Configure DNS & SSL** ✅
+  - [x] Request ACM certificate for `workoutcoach.liamocasey.com` (us-east-1)
+  - [x] Add DNS validation CNAME at GoDaddy
+  - [x] Create CloudFront distribution with S3 website origin
+  - [x] Configure alternate domain name and SSL certificate
+  - [x] Add CNAME record `workoutcoach` → CloudFront distribution
+  - [x] Add `CLOUDFRONT_DISTRIBUTION_ID` to GitHub secrets
 
-- [ ] **Step 11: Run Database Migrations** 📋 [See CLI Guide](LOC-7_STEP7_CLI_GUIDE.md#step-12-run-database-migrations)
-  - [ ] Run Alembic migrations against production database
-  - [ ] Verify tables exist and app connects
+- [x] **Step 11: Run Database Migrations** ✅
+  - [x] Add migration job to GitHub Actions workflow (runs before deployment)
+  - [x] Create manual migration script (`backend/scripts/run_migrations.py`)
+  - [x] Migrations auto-run on next push to main
+  - [x] Tables verified: `workout_plans`, `workouts`, `strava_sessions`, `strava_activities`, `auth_sessions`
 
 - [ ] **Step 12: Final Testing** 📋 [See CLI Guide](LOC-7_STEP7_CLI_GUIDE.md#step-13-final-testing)
   - [ ] Test login from desktop browser
@@ -133,8 +138,9 @@ MAX_WORKOUT_PLANS=5
 
 - Strava integration will only work locally until LOC-10 is completed
 - Frontend is rebuilt automatically on each push to main
-- Database migrations should be run before first deployment
+- **Database migrations run automatically** - CI/CD runs Alembic before deployment
 - **No local Docker required** - GitHub Actions builds images remotely
+- **Manual migrations**: Run `python scripts/run_migrations.py` in `backend/` directory
 - **CLI Guide**: Full step-by-step AWS commands in [LOC-7_STEP7_CLI_GUIDE.md](LOC-7_STEP7_CLI_GUIDE.md)
 - **GitHub Workflow**: [.github/workflows/deploy.yml](../.github/workflows/deploy.yml)
 

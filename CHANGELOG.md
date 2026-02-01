@@ -13,11 +13,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Frontend: `LoginPage.jsx` with form, auth state in `App.jsx`
   - Endpoints: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/check`
   - Disabled in dev if `AUTH_USERNAME`/`AUTH_PASSWORD` not set
-- **Production Deployment Config (LOC-7 Steps 1-6)**
+- **Production Deployment Config (LOC-7)**
   - Backend Dockerfile: Python 3.11-slim, gunicorn, non-root user
   - Frontend Dockerfile: Multi-stage build with nginx
   - `docker-compose.production.yml` for local prod testing
   - `env.production.template` with documented variables
+- **GitHub Actions CI/CD** (`.github/workflows/deploy.yml`)
+  - Auto-deploys on push to main
+  - Builds Docker on GitHub (no local Docker needed)
+  - Backend → AWS Lightsail container service
+  - Frontend → S3 static site
+  - CloudFront cache invalidation (optional)
+  - **Database migrations**: Runs `alembic upgrade head` before deployment
+- **Migration Helper Script** (`backend/scripts/run_migrations.py`)
+  - Manual migration tool for local or production use
+  - Flags: `--status`, `--history`, `--verify`
+  - Auto-verifies expected tables after migration
+- **AWS Infrastructure**
+  - Lightsail container service: `workout-coach-backend`
+  - S3 bucket: `workoutcoach-frontend` (public static hosting)
+  - IAM user with AdministratorAccess for deployments
 - **Environment-Driven URLs**: `FRONTEND_URL`, `CORS_ORIGINS`, `VITE_API_URL`
 - **Mobile-First UI Redesign**: Fully responsive, high-contrast "sporty" interface inspired by professional training tools.
 - **Horizontal Day Picker**: New scrollable navigation for the week view on mobile.
@@ -25,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Side-by-Side Metrics**: Workout cards now show "Planned vs. Actual" durations and distances.
 - **Bottom-Sheet Edit View**: Mobile-optimized modal for updating workout details.
 - **Quick Action Buttons**: Touch-friendly buttons (min 44x44px) for one-tap completion and editing.
+- **Desktop Navigation**: Horizontal tab bar below header for screens ≥769px (Week, Month, Coach, Strava, Settings)
+- **CloudFront CDN**: SSL termination and caching for frontend at `workoutcoach.liamocasey.com`
 
 ### Changed
 - All API routes now protected with `@require_auth` (except `/api/health`)

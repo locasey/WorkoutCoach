@@ -4,7 +4,7 @@ import { useSwipeable } from 'react-swipeable';
 import { WorkoutCard } from './WorkoutCard';
 import { MonthView } from './MonthView';
 import { WorkoutEditModal } from './WorkoutEditModal';
-import { ChevronLeft, ChevronRight, Calendar, LayoutGrid, MessageSquare, CheckCircle, Clock, MapPin, Edit3 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, LayoutGrid, MessageSquare, CheckCircle, Clock, MapPin, Edit3, Plus } from 'lucide-react';
 import { mapWorkoutToDesign, getWorkoutStatus } from '../utils/workoutMapper';
 import { SkeletonWeek, SkeletonMonth } from './SkeletonLoader';
 import { useToast } from './Toast';
@@ -30,65 +30,99 @@ export function WeekAheadView({ initialView = 'week' }) {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
 
+  // LOC-22: Grouped workouts by day (supports multiple workouts per day)
+  const [groupedWorkouts, setGroupedWorkouts] = useState({});
+  // Active plan ID for adding workouts
+  const [activePlanId, setActivePlanId] = useState(null);
+
   // Fetch workouts for current week
   const fetchWeekWorkouts = async (offset = 0) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await axios.get(`${API_BASE_URL}/workouts/week/${offset}`);
       const dbWorkouts = response.data.workouts || [];
-      
+
       // Map to design format
       const mappedWorkouts = dbWorkouts.map(mapWorkoutToDesign);
-      
-      // Create a map of day names to workouts
-      const dayMap = {};
+
+      // LOC-22: Group workouts by scheduled date (supports multiple workouts per day)
+      // Create a map of scheduled_date to array of workouts
+      const dateMap = {};
       mappedWorkouts.forEach(workout => {
-        if (workout.day) {
-          dayMap[workout.day] = workout;
+        const key = workout.scheduledDate || workout.day;
+        if (!dateMap[key]) {
+          dateMap[key] = [];
         }
+        dateMap[key].push(workout);
+        // Sort by slot (null first, then 1=AM, then 2=PM)
+        dateMap[key].sort((a, b) => (a.slot || 0) - (b.slot || 0));
       });
-      
+
       // Get week start date to determine which days are in this week
       const weekStart = response.data.week_start ? new Date(response.data.week_start) : null;
       const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      
-      // Ensure we have workouts for all 7 days (Mon-Sun)
-      const weekWorkouts = dayNames.map((day, index) => {
-        if (dayMap[day]) {
-          return dayMap[day];
-        }
-        // Create placeholder for missing days
-        // If we have week_start, we can calculate the actual date
+
+      // Build week structure: each day can have 1-2 workouts
+      // For backward compatibility, the workouts array contains all workouts
+      // but we also store groupedWorkouts for multi-workout display
+      const allWorkouts = [];
+      const groupedByDay = {};
+
+      dayNames.forEach((day, index) => {
+        // Calculate the scheduled date for this day
         let scheduledDate = null;
         if (weekStart) {
           const date = new Date(weekStart);
           date.setDate(date.getDate() + index);
           scheduledDate = date.toISOString().split('T')[0];
         }
-        
-        return {
-          id: `placeholder-${day}`,
-          day: day,
-          type: '',
-          distance: '',
-          status: 'pending',
-          scheduledDate: scheduledDate,
-          _original: null
-        };
+
+        // Check if we have workouts for this date
+        const dayWorkouts = dateMap[scheduledDate] || dateMap[day] || [];
+
+        if (dayWorkouts.length > 0) {
+          // Add all workouts for this day
+          dayWorkouts.forEach(w => allWorkouts.push(w));
+          groupedByDay[day] = dayWorkouts;
+        } else {
+          // Create placeholder for missing days
+          const placeholder = {
+            id: `placeholder-${day}`,
+            day: day,
+            type: '',
+            distance: '',
+            status: 'pending',
+            scheduledDate: scheduledDate,
+            slot: null,
+            _original: null
+          };
+          allWorkouts.push(placeholder);
+          groupedByDay[day] = [placeholder];
+        }
       });
-      
-      setWorkouts(weekWorkouts);
-      
+
+      // Store both flat list (for backward compat) and grouped structure
+      setWorkouts(allWorkouts);
+      setGroupedWorkouts(groupedByDay);
+
+      // Get active plan ID from first workout (for adding new workouts)
+      if (allWorkouts.length > 0 && allWorkouts[0]._original?.workout_plan_id) {
+        setActivePlanId(allWorkouts[0]._original.workout_plan_id);
+      }
+
       // Set initial selected day index to today if we're in the current week
       if (offset === 0) {
-        const todayIndex = weekWorkouts.findIndex(w => isTodayInWeek(w.scheduledDate));
+        // Find today in the day names array
+        const today = new Date();
+        const todayDayName = dayNames[today.getDay() === 0 ? 6 : today.getDay() - 1];
+        const todayIndex = dayNames.indexOf(todayDayName);
         if (todayIndex !== -1) {
           setSelectedDayIndex(todayIndex);
         }
       }
-      
+
       // Fetch progress
       const progressResponse = await axios.get(`${API_BASE_URL}/workouts/progress`, {
         params: { week_offset: offset }
@@ -256,6 +290,46 @@ export function WeekAheadView({ initialView = 'week' }) {
     setWorkouts(prevWorkouts =>
       prevWorkouts.map(w => w.id === updatedWorkout.id ? updatedWorkout : w)
     );
+
+    // Also update grouped workouts
+    setGroupedWorkouts(prev => {
+      const newGrouped = { ...prev };
+      Object.keys(newGrouped).forEach(day => {
+        newGrouped[day] = newGrouped[day].map(w =>
+          w.id === updatedWorkout.id ? updatedWorkout : w
+        );
+      });
+      return newGrouped;
+    });
+  };
+
+  // LOC-22: Handle adding a new workout to a day
+  const handleAddWorkout = async (scheduledDate) => {
+    if (!activePlanId || !scheduledDate) {
+      toast.error('Cannot add workout: no active plan');
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/workouts/day`, {
+        workout_plan_id: activePlanId,
+        scheduled_date: scheduledDate,
+        type: 'easy_run',  // Default type
+        duration_minutes: 30,
+        notes: 'New workout added'
+      });
+
+      const newWorkout = mapWorkoutToDesign(response.data.workout);
+
+      // Refresh the week to get updated data
+      fetchWeekWorkouts(weekOffset);
+
+      toast.success('Workout added! Edit it to customize.');
+    } catch (err) {
+      console.error('Error adding workout:', err);
+      const errorMsg = err.response?.data?.error || 'Failed to add workout';
+      toast.error(errorMsg);
+    }
   };
 
   // Handle day click from month view - navigate to that week in week view
@@ -350,7 +424,11 @@ export function WeekAheadView({ initialView = 'week' }) {
     return today.getTime() === workoutDate.getTime();
   };
 
-  const activeWorkout = workouts[selectedDayIndex] || null;
+  // LOC-22: Get active workout(s) from grouped structure based on selected day index
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const selectedDayName = dayNames[selectedDayIndex];
+  const selectedDayWorkouts = groupedWorkouts[selectedDayName] || [];
+  const activeWorkout = selectedDayWorkouts[0] || null; // Primary workout for hero display
   const isActiveToday = activeWorkout && isTodayInWeek(activeWorkout.scheduledDate);
 
   const weekRange = viewMode === 'week' ? getWeekRange() : null;
@@ -445,29 +523,45 @@ export function WeekAheadView({ initialView = 'week' }) {
             </div>
           </div>
           
-          {/* Day Picker */}
+          {/* Day Picker - LOC-22: Uses grouped workouts to show primary workout per day */}
           <div className="day-picker">
-            {workouts.map((workout, index) => {
-              const isToday = isTodayInWeek(workout.scheduledDate);
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
+              const dayWorkouts = groupedWorkouts[day] || [];
+              const primaryWorkout = dayWorkouts[0]; // First/only workout for display
+              const isToday = primaryWorkout && isTodayInWeek(primaryWorkout.scheduledDate);
               const isActive = selectedDayIndex === index;
+              const hasMultiple = dayWorkouts.length > 1;
 
               // Display workout metric: duration > distance > Rest > --
               const getDisplayValue = () => {
-                if (workout.status === 'rest') return 'Rest';
-                if (workout.duration) return workout.duration.replace(' ', ''); // "30 min" -> "30min"
-                if (workout.distance) return workout.distance; // Already "6km"
+                if (!primaryWorkout || !primaryWorkout.type) return '--';
+                if (primaryWorkout.status === 'rest') return 'Rest';
+                if (primaryWorkout.duration) return primaryWorkout.duration.replace(' ', '');
+                if (primaryWorkout.distance) return primaryWorkout.distance;
                 return '--';
+              };
+
+              // Get combined status for indicator (completed if all complete, rest if all rest)
+              const getStatus = () => {
+                if (!primaryWorkout || !primaryWorkout.type) return 'pending';
+                if (dayWorkouts.every(w => w.status === 'completed')) return 'completed';
+                if (dayWorkouts.every(w => w.status === 'rest')) return 'rest';
+                if (dayWorkouts.some(w => w.status === 'completed')) return 'partial';
+                return primaryWorkout.status;
               };
 
               return (
                 <div
-                  key={workout.id}
+                  key={day}
                   className={`day-item ${isActive ? 'active' : ''} ${isToday ? 'today' : ''}`}
                   onClick={() => setSelectedDayIndex(index)}
                 >
-                  <span className="day-name">{workout.day}</span>
-                  <span className="day-number">{getDisplayValue()}</span>
-                  <div className={`day-status-indicator status-${workout.status}`} />
+                  <span className="day-name">{day}</span>
+                  <span className="day-number">
+                    {getDisplayValue()}
+                    {hasMultiple && <span className="text-xs ml-0.5">+1</span>}
+                  </span>
+                  <div className={`day-status-indicator status-${getStatus()}`} />
                 </div>
               );
             })}
@@ -503,7 +597,7 @@ export function WeekAheadView({ initialView = 'week' }) {
               </div>
             ) : (
               <>
-                {/* Mobile: Today Hero Section */}
+                {/* Mobile: Today Hero Section - LOC-20 + LOC-22 */}
                 <div className="md:hidden">
                   {activeWorkout && (
                     <div className="today-hero">
@@ -518,11 +612,19 @@ export function WeekAheadView({ initialView = 'week' }) {
                           </div>
                         )}
                       </div>
-                      
+
                       <h3 className="hero-title">
                         {activeWorkout.status === 'rest' ? 'Rest Day' : (activeWorkout.type || 'No Workout')}
                       </h3>
-                      
+
+                      {/* LOC-22: Show slot indicator if this day has multiple workouts */}
+                      {activeWorkout.slot && (
+                        <div className="text-xs text-gray-500 mb-2">
+                          {activeWorkout.slot === 1 ? 'AM Session' : 'PM Session'}
+                        </div>
+                      )}
+
+                      {/* Show metrics only for non-rest workouts */}
                       {activeWorkout.status !== 'rest' && activeWorkout.type && (
                         <>
                           <div className="hero-metrics">
@@ -535,52 +637,97 @@ export function WeekAheadView({ initialView = 'week' }) {
                               <span className="metric-label">Distance</span>
                             </div>
                           </div>
-                          
+
                           {activeWorkout.notes && (
                             <p className="hero-description line-clamp-3">
                               {activeWorkout.notes}
                             </p>
                           )}
-                          
-                          <div className="hero-actions">
-                            <button 
+                        </>
+                      )}
+
+                      {/* LOC-20: Rest day message */}
+                      {activeWorkout.status === 'rest' && (
+                        <p className="hero-description mt-4">
+                          Enjoy your rest day! Recovery is just as important as the work.
+                        </p>
+                      )}
+
+                      {/* LOC-20: Action buttons - Edit always shown, Mark Complete only for non-rest */}
+                      {activeWorkout.type && (
+                        <div className="hero-actions">
+                          {/* Mark Complete - ONLY for non-rest workouts */}
+                          {activeWorkout.status !== 'rest' && (
+                            <button
                               onClick={() => toggleWorkoutStatus(activeWorkout.id)}
                               className={`btn-hero ${activeWorkout.status === 'completed' ? 'btn-hero-secondary' : 'btn-hero-primary'}`}
                             >
                               <CheckCircle className="w-5 h-5" />
                               {activeWorkout.status === 'completed' ? 'Unmark Complete' : 'Mark Complete'}
                             </button>
-                            <button 
-                              onClick={() => handleEdit(activeWorkout.id)}
-                              className="btn-hero btn-hero-secondary"
-                            >
-                              <Edit3 className="w-5 h-5" />
-                              Edit
-                            </button>
-                          </div>
-                        </>
-                      )}
-                      
-                      {activeWorkout.status === 'rest' && (
-                        <p className="hero-description mt-4">
-                          Enjoy your rest day! Recovery is just as important as the work.
-                        </p>
+                          )}
+
+                          {/* Edit - ALWAYS shown (LOC-20 fix for rest days) */}
+                          <button
+                            onClick={() => handleEdit(activeWorkout.id)}
+                            className={`btn-hero ${activeWorkout.status === 'rest' ? 'btn-hero-primary' : 'btn-hero-secondary'}`}
+                          >
+                            <Edit3 className="w-5 h-5" />
+                            Edit
+                          </button>
+
+                          {/* LOC-22: Add Workout button when day has < 2 workouts */}
+                          {activePlanId && activeWorkout.scheduledDate && (() => {
+                            const dayWorkouts = groupedWorkouts[activeWorkout.day] || [];
+                            return dayWorkouts.length < 2 && (
+                              <button
+                                onClick={() => handleAddWorkout(activeWorkout.scheduledDate)}
+                                className="btn-hero btn-hero-secondary"
+                              >
+                                <Plus className="w-5 h-5" />
+                                Add Workout
+                              </button>
+                            );
+                          })()}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
 
-                {/* Desktop: Grid Layout */}
+                {/* Desktop: Grid Layout - LOC-22: Support multiple workouts per day */}
                 <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                  {workouts.map((workout) => (
-                    <WorkoutCard
-                      key={workout.id}
-                      workout={workout}
-                      isToday={isTodayInWeek(workout.scheduledDate)}
-                      onToggle={() => toggleWorkoutStatus(workout.id)}
-                      onEdit={() => handleEdit(workout.id)}
-                    />
-                  ))}
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
+                    const dayWorkouts = groupedWorkouts[day] || [];
+                    const firstWorkout = dayWorkouts[0];
+                    const hasMultiple = dayWorkouts.length > 1;
+
+                    return (
+                      <div key={day} className="workout-day-column flex flex-col gap-2">
+                        {dayWorkouts.map((workout, idx) => (
+                          <WorkoutCard
+                            key={workout.id}
+                            workout={workout}
+                            isToday={isTodayInWeek(workout.scheduledDate)}
+                            onToggle={() => toggleWorkoutStatus(workout.id)}
+                            onEdit={() => handleEdit(workout.id)}
+                            isAM={hasMultiple && idx === 0}
+                            isPM={hasMultiple && idx === 1}
+                          />
+                        ))}
+                        {/* LOC-22: Add Workout button when day has < 2 workouts */}
+                        {activePlanId && firstWorkout?.scheduledDate && dayWorkouts.length < 2 && (
+                          <button
+                            onClick={() => handleAddWorkout(firstWorkout.scheduledDate)}
+                            className="w-full p-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-persian-blue hover:text-persian-blue transition-colors flex items-center justify-center gap-1 text-sm"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Add
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}

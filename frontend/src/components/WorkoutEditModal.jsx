@@ -183,7 +183,15 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
         <div className="md:hidden bottom-sheet-handle" />
         
         <div className="modal-header">
-          <h2>Edit Workout</h2>
+          <h2>
+            Edit Workout
+            {/* LOC-22: Show slot indicator when workout is part of multi-workout day */}
+            {workout.slot && (
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                ({workout.slot === 1 ? 'AM Session' : 'PM Session'})
+              </span>
+            )}
+          </h2>
           <button onClick={handleClose} className="p-2 text-gray-400 hover:text-black">
             <X className="w-6 h-6" />
           </button>

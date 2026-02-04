@@ -227,9 +227,10 @@ class WorkoutPlanService:
         
         if user_id is not None:
             query = query.filter(WorkoutPlan.user_id == user_id)
-        
-        return query.order_by(Workout.scheduled_date, Workout.day).all()
-    
+
+        # Order by date, then slot (NULL first = single workout, then AM=1, PM=2)
+        return query.order_by(Workout.scheduled_date, Workout.slot.nullsfirst()).all()
+
     @staticmethod
     def get_workouts_for_month(db: Session, year: int, month: int, user_id: int = None) -> list[Workout]:
         """
@@ -256,9 +257,10 @@ class WorkoutPlanService:
         
         if user_id is not None:
             query = query.filter(WorkoutPlan.user_id == user_id)
-        
-        return query.order_by(Workout.scheduled_date, Workout.day).all()
-    
+
+        # Order by date, then slot (NULL first = single workout, then AM=1, PM=2)
+        return query.order_by(Workout.scheduled_date, Workout.slot.nullsfirst()).all()
+
     @staticmethod
     def get_week_progress(db: Session, week_start: date, week_end: date, user_id: int = None) -> dict:
         """
@@ -434,9 +436,218 @@ class WorkoutPlanService:
         # updated_at is automatically set by SQLAlchemy's onupdate
         db.commit()
         db.refresh(workout)
-        
+
         return workout
-    
+
+    @staticmethod
+    def validate_workout_slot(
+        db: Session,
+        workout_plan_id: uuid.UUID,
+        scheduled_date: date,
+        slot: int = None,
+        exclude_workout_id: uuid.UUID = None
+    ) -> bool:
+        """
+        Validate that a workout slot is available for a given day.
+        Max 2 workouts per day allowed.
+
+        Args:
+            db: Database session
+            workout_plan_id: ID of the workout plan
+            scheduled_date: Date to check
+            slot: Requested slot (1=AM, 2=PM, or None for auto-assign)
+            exclude_workout_id: Workout ID to exclude (for updates)
+
+        Returns:
+            True if slot is available
+
+        Raises:
+            ValueError: If slot is not available or max workouts exceeded
+        """
+        query = db.query(Workout).filter(
+            Workout.workout_plan_id == workout_plan_id,
+            Workout.scheduled_date == scheduled_date
+        )
+
+        if exclude_workout_id:
+            query = query.filter(Workout.id != exclude_workout_id)
+
+        existing = query.all()
+
+        # Check max 2 per day
+        if len(existing) >= 2:
+            raise ValueError("Maximum 2 workouts per day allowed")
+
+        # Check if specific slot is requested and already occupied
+        if slot and any(w.slot == slot for w in existing):
+            slot_name = "AM" if slot == 1 else "PM"
+            raise ValueError(f"{slot_name} slot already occupied for this day")
+
+        return True
+
+    @staticmethod
+    def get_workouts_for_day(
+        db: Session,
+        workout_plan_id: uuid.UUID,
+        scheduled_date: date
+    ) -> list:
+        """
+        Get all workouts for a specific day in a plan.
+
+        Args:
+            db: Database session
+            workout_plan_id: ID of the workout plan
+            scheduled_date: Date to get workouts for
+
+        Returns:
+            List of Workout objects ordered by slot
+        """
+        return db.query(Workout).filter(
+            Workout.workout_plan_id == workout_plan_id,
+            Workout.scheduled_date == scheduled_date
+        ).order_by(Workout.slot.nullsfirst()).all()
+
+    @staticmethod
+    def add_workout_to_day(
+        db: Session,
+        workout_plan_id: uuid.UUID,
+        scheduled_date: date,
+        workout_data: dict,
+        user_id: int = None
+    ) -> Workout:
+        """
+        Add a workout to a day that may already have one workout.
+        Handles slot assignment automatically:
+        - If day is empty: new workout gets slot=NULL (single)
+        - If day has 1 workout: existing gets slot=1 (AM), new gets slot=2 (PM)
+        - If day has 2 workouts: raises error
+
+        Args:
+            db: Database session
+            workout_plan_id: ID of the workout plan
+            scheduled_date: Date to add workout to (ISO string or date object)
+            workout_data: Dictionary with workout fields (type, distance_km, etc.)
+            user_id: Optional user ID filter
+
+        Returns:
+            Created Workout object
+
+        Raises:
+            ValueError: If plan not found, max workouts exceeded, or validation fails
+        """
+        # Convert string date to date object if needed
+        if isinstance(scheduled_date, str):
+            scheduled_date = datetime.fromisoformat(scheduled_date).date()
+
+        # Verify plan exists and is active
+        plan = db.query(WorkoutPlan).filter(WorkoutPlan.id == workout_plan_id).first()
+        if not plan:
+            raise ValueError(f"Workout plan with id {workout_plan_id} not found")
+
+        if user_id is not None and plan.user_id != user_id:
+            raise ValueError(f"Workout plan with id {workout_plan_id} not found")
+
+        # Get existing workouts for this day
+        existing = WorkoutPlanService.get_workouts_for_day(db, workout_plan_id, scheduled_date)
+
+        if len(existing) >= 2:
+            raise ValueError("Maximum 2 workouts per day allowed")
+
+        # Determine week/day numbers from scheduled_date
+        # Calculate week number: (date - start_date).days // 7 + 1
+        if plan.start_date:
+            days_diff = (scheduled_date - plan.start_date).days
+            week_number = days_diff // 7 + 1
+            # Day of week: 1=Monday, 7=Sunday
+            day_of_week = scheduled_date.weekday() + 1
+        else:
+            week_number = 1
+            day_of_week = scheduled_date.weekday() + 1
+
+        # Validate workout data
+        validation_errors = WorkoutPlanService._validate_workout_data(workout_data)
+        if validation_errors:
+            error_message = "; ".join([f"{k}: {v}" for k, v in validation_errors.items()])
+            raise ValueError(f"Validation errors: {error_message}")
+
+        # Handle slot assignment
+        new_slot = None
+        if len(existing) == 1:
+            # Upgrade existing workout to AM slot if it has no slot
+            if existing[0].slot is None:
+                existing[0].slot = 1
+            # New workout gets PM slot
+            new_slot = 2
+
+        # Create new workout
+        new_workout = Workout(
+            workout_plan_id=workout_plan_id,
+            week=week_number,
+            day=day_of_week,
+            slot=new_slot,
+            type=workout_data.get('type', 'rest'),
+            distance_km=float(workout_data['distance_km']) if workout_data.get('distance_km') else None,
+            duration_minutes=int(workout_data['duration_minutes']) if workout_data.get('duration_minutes') else None,
+            pace=workout_data.get('pace'),
+            notes=workout_data.get('notes'),
+            scheduled_date=scheduled_date,
+            is_completed=False
+        )
+
+        db.add(new_workout)
+        db.commit()
+        db.refresh(new_workout)
+
+        return new_workout
+
+    @staticmethod
+    def delete_workout(db: Session, workout_id: uuid.UUID, user_id: int = None) -> bool:
+        """
+        Delete a workout. If this leaves only one workout on the day,
+        demote that workout's slot back to NULL.
+
+        Args:
+            db: Database session
+            workout_id: ID of workout to delete
+            user_id: Optional user ID filter
+
+        Returns:
+            True if deleted
+
+        Raises:
+            ValueError: If workout not found
+        """
+        workout = db.query(Workout).filter(Workout.id == workout_id).first()
+        if not workout:
+            raise ValueError(f"Workout with id {workout_id} not found")
+
+        # Check user_id if provided (via workout plan)
+        if user_id is not None:
+            plan = db.query(WorkoutPlan).filter(WorkoutPlan.id == workout.workout_plan_id).first()
+            if plan and plan.user_id != user_id:
+                raise ValueError(f"Workout with id {workout_id} not found")
+
+        # Store date and plan_id before deletion
+        scheduled_date = workout.scheduled_date
+        workout_plan_id = workout.workout_plan_id
+
+        # Delete the workout
+        db.delete(workout)
+        db.flush()
+
+        # Check if there's now only one workout left on this day
+        remaining = db.query(Workout).filter(
+            Workout.workout_plan_id == workout_plan_id,
+            Workout.scheduled_date == scheduled_date
+        ).all()
+
+        # If exactly one workout remains with a slot, demote it to NULL
+        if len(remaining) == 1 and remaining[0].slot is not None:
+            remaining[0].slot = None
+
+        db.commit()
+        return True
+
     @staticmethod
     def check_plan_limit(db: Session, max_plans: int = 5) -> dict:
         """

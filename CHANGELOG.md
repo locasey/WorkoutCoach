@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Multiple Workouts Per Day (LOC-22)**
+  - New `slot` column on workouts table: NULL=single, 1=AM, 2=PM (max 2 per day)
+  - `POST /api/workouts/day` - Add workout to a day with auto slot assignment
+  - `DELETE /api/workouts/<id>` - Delete workout (demotes remaining to single slot)
+  - `GET /api/workouts/day/<date>` - Get all workouts for a specific date
+  - Frontend: Day picker shows "+1" badge when day has 2 workouts
+  - Frontend: Desktop grid stacks workout cards with AM/PM indicators
+  - Frontend: "Add Workout" button on days with < 2 workouts
+  - MonthView: Calendar cells display multiple workouts with AM/PM labels
 - **Plan Management Usability (LOC-13)**
   - Workout plan `name` field: backend column + migration with backfill (goal or "Plan - Mon YYYY"), auto-name on create
   - PATCH `/api/workout-plans/<id>` to update plan name (max 255 chars)
@@ -74,6 +83,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Non-root user in backend Docker container
 
 ### Fixed
+- **Rest Day Editing (LOC-20)**: Rest days can now be edited on mobile and desktop
+  - Edit button always visible for rest days (previously hidden on mobile)
+  - Mark Complete button hidden (not just disabled) for rest days
+  - Applies to WeekAheadView hero, WorkoutCard, and MonthView
 - **Critical**: Fixed blank screen bug caused by undefined `swipeHandlers` in WeekAheadView - `useSwipeable` hook was imported but never called.
 - **LOC-21**: Fixed NaN display in mobile day picker - now shows workout duration (e.g., "30min"), distance (e.g., "6km"), "Rest", or "--" instead of broken date numbers.
 - Improved mobile responsiveness across all main views.

@@ -688,6 +688,157 @@ def update_workout(workout_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/workouts/day', methods=['POST'])
+@require_auth
+def add_workout_to_day():
+    """
+    Add an additional workout to a specific day (LOC-22: Multiple workouts per day).
+
+    Supports up to 2 workouts per day. When adding a second workout:
+    - Existing workout gets slot=1 (AM)
+    - New workout gets slot=2 (PM)
+
+    Request body:
+        {
+            "workout_plan_id": "uuid",
+            "scheduled_date": "YYYY-MM-DD",
+            "type": "string",           # e.g., "easy_run", "rest"
+            "distance_km": float,       # optional
+            "duration_minutes": int,    # optional
+            "pace": "string",           # optional
+            "notes": "string"           # optional
+        }
+
+    Returns:
+        Created workout object with slot assignment
+    """
+    try:
+        data = request.json
+        if data is None:
+            return jsonify({"error": "Request body is required"}), 400
+
+        # Validate required fields
+        required_fields = ['workout_plan_id', 'scheduled_date']
+        missing = [f for f in required_fields if f not in data or not data[f]]
+        if missing:
+            return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+        db = next(get_db())
+        try:
+            workout = WorkoutPlanService.add_workout_to_day(
+                db=db,
+                workout_plan_id=uuid.UUID(data['workout_plan_id']),
+                scheduled_date=data['scheduled_date'],
+                workout_data=data,
+                user_id=None
+            )
+
+            logger.info(f"Added workout to day: {data['scheduled_date']} (slot={workout.slot})")
+            return jsonify({
+                'workout': workout.to_dict(),
+                'message': 'Workout added successfully'
+            }), 201
+        except ValueError as e:
+            error_msg = str(e)
+            if "not found" in error_msg.lower():
+                return jsonify({"error": error_msg}), 404
+            # Validation errors (max 2 per day, slot occupied, etc.)
+            return jsonify({"error": error_msg}), 400
+        finally:
+            db.close()
+
+    except ValueError as e:
+        return jsonify({"error": f"Invalid ID format: {str(e)}"}), 400
+    except Exception as e:
+        log_error("Error adding workout to day", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/workouts/<workout_id>', methods=['DELETE'])
+@require_auth
+def delete_workout(workout_id):
+    """
+    Delete a workout (LOC-22: Supports multiple workouts per day).
+
+    When deleting one of two workouts on a day, the remaining workout's
+    slot is demoted back to NULL (single workout display).
+
+    Returns:
+        Success message with deleted workout ID
+    """
+    try:
+        db = next(get_db())
+        try:
+            WorkoutPlanService.delete_workout(db, uuid.UUID(workout_id), user_id=None)
+
+            logger.info(f"Deleted workout: {workout_id}")
+            return jsonify({
+                'message': 'Workout deleted successfully',
+                'deleted_workout_id': workout_id
+            })
+        except ValueError as e:
+            error_msg = str(e)
+            if "not found" in error_msg.lower():
+                return jsonify({"error": error_msg}), 404
+            return jsonify({"error": error_msg}), 400
+        finally:
+            db.close()
+
+    except ValueError as e:
+        return jsonify({"error": f"Invalid workout ID: {str(e)}"}), 400
+    except Exception as e:
+        log_error("Error deleting workout", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/workouts/day/<scheduled_date>', methods=['GET'])
+@require_auth
+def get_workouts_for_day(scheduled_date):
+    """
+    Get all workouts for a specific day (LOC-22).
+
+    Args:
+        scheduled_date: ISO date string (YYYY-MM-DD)
+
+    Returns:
+        List of workouts for the day, ordered by slot
+    """
+    try:
+        db = next(get_db())
+        try:
+            # Get active plan
+            active_plan = WorkoutPlanService.get_active_workout_plan(db, user_id=None)
+            if not active_plan:
+                return jsonify({
+                    'workouts': [],
+                    'count': 0,
+                    'message': 'No active workout plan'
+                })
+
+            # Parse date
+            from datetime import datetime as dt
+            try:
+                target_date = dt.fromisoformat(scheduled_date).date()
+            except ValueError:
+                return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
+
+            workouts = WorkoutPlanService.get_workouts_for_day(
+                db, active_plan.id, target_date
+            )
+
+            return jsonify({
+                'scheduled_date': scheduled_date,
+                'workouts': [w.to_dict() for w in workouts],
+                'count': len(workouts)
+            })
+        finally:
+            db.close()
+
+    except Exception as e:
+        log_error("Error getting workouts for day", e)
+        return jsonify({"error": str(e)}), 500
+
+
 # ============================================================================
 # Strava Integration Endpoints (Phase 6: Secure Session Management)
 # ============================================================================

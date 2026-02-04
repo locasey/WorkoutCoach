@@ -23,12 +23,18 @@ export function MonthView({ workouts, onToggle, onEdit, onDayClick, currentMonth
     let startDay = firstDay.getDay() - 1;
     if (startDay < 0) startDay = 6; // Sunday becomes 6
 
-    // Create a map of scheduled dates to workouts for efficient lookup
+    // LOC-22: Create a map of scheduled dates to array of workouts (supports multiple per day)
     const workoutMap = new Map();
     workouts.forEach(w => {
       if (w._original?.scheduled_date) {
         // scheduled_date comes as ISO string "YYYY-MM-DD"
-        workoutMap.set(w._original.scheduled_date, w);
+        const dateKey = w._original.scheduled_date;
+        if (!workoutMap.has(dateKey)) {
+          workoutMap.set(dateKey, []);
+        }
+        workoutMap.get(dateKey).push(w);
+        // Sort by slot (null first, then 1=AM, 2=PM)
+        workoutMap.get(dateKey).sort((a, b) => (a.slot || 0) - (b.slot || 0));
       }
     });
 
@@ -43,7 +49,7 @@ export function MonthView({ workouts, onToggle, onEdit, onDayClick, currentMonth
         date: prevDate,
         fullDate: new Date(prevYear, prevMonth - 1, prevDate),
         isCurrentMonth: false,
-        workout: workoutMap.get(dateStr) || null
+        workouts: workoutMap.get(dateStr) || [] // LOC-22: Array of workouts
       });
     }
 
@@ -55,7 +61,7 @@ export function MonthView({ workouts, onToggle, onEdit, onDayClick, currentMonth
         date,
         fullDate: new Date(currentYear, currentMonth - 1, date),
         isCurrentMonth: true,
-        workout: workoutMap.get(dateStr) || null
+        workouts: workoutMap.get(dateStr) || [] // LOC-22: Array of workouts
       });
     }
 
@@ -69,7 +75,7 @@ export function MonthView({ workouts, onToggle, onEdit, onDayClick, currentMonth
         date: i,
         fullDate: new Date(nextYear, nextMonth - 1, i),
         isCurrentMonth: false,
-        workout: workoutMap.get(dateStr) || null
+        workouts: workoutMap.get(dateStr) || [] // LOC-22: Array of workouts
       });
     }
 
@@ -132,20 +138,23 @@ export function MonthView({ workouts, onToggle, onEdit, onDayClick, currentMonth
             ))}
           </div>
 
-          {/* Calendar grid */}
+          {/* Calendar grid - LOC-22: Updated to show multiple workouts per day */}
           <div className="grid grid-cols-7 gap-2">
             {calendar.map((day, index) => {
               const isTodayCell = isToday(day.fullDate);
+              const hasWorkoutsForDay = day.workouts && day.workouts.length > 0;
+              const hasMultiple = day.workouts && day.workouts.length > 1;
+
               return (
                 <div
                   key={index}
                   onClick={() => onDayClick && onDayClick(day.fullDate)}
-                  title={day.workout ? `${day.workout.type}${day.workout.distance ? ` - ${day.workout.distance}` : ''} (${day.workout.status})` : ''}
+                  title={hasWorkoutsForDay ? day.workouts.map(w => `${w.type}${w.distance ? ` - ${w.distance}` : ''}`).join(' | ') : ''}
                   className={`border rounded-lg p-3 min-h-[120px] cursor-pointer transition-all ${
                     day.isCurrentMonth
                       ? 'bg-white border-[#8eb19d]'
                       : 'bg-[#eacdc2]/30 border-[#eacdc2]'
-                  } ${day.workout ? 'hover:shadow-md hover:scale-[1.02]' : 'hover:bg-[#eacdc2]/20'} ${
+                  } ${hasWorkoutsForDay ? 'hover:shadow-md hover:scale-[1.02]' : 'hover:bg-[#eacdc2]/20'} ${
                     isTodayCell ? 'ring-2 ring-persian-blue ring-offset-1' : ''
                   }`}
                 >
@@ -159,54 +168,65 @@ export function MonthView({ workouts, onToggle, onEdit, onDayClick, currentMonth
                     )}
                   </div>
 
-            {/* Workout info */}
-            {day.workout && (
-              <div className="space-y-2">
-                <div className={`text-xs font-medium ${
-                  day.workout.status === 'completed' ? 'text-[#8eb19d]' :
-                  day.workout.status === 'rest' ? 'text-[#a44200]' :
-                  'text-[#072ac8]'
-                }`}>
-                  {day.workout.type}
-                </div>
-                {day.workout.distance && (
-                  <div className="text-xs text-[#1e1b18]/70">{day.workout.distance}</div>
-                )}
-                
-                {/* Actions */}
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggle(day.workout.id);
-                    }}
-                    disabled={day.workout.status === 'rest'}
-                    className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
-                      day.workout.status === 'completed'
-                        ? 'border-[#8eb19d] bg-[#8eb19d]'
-                        : day.workout.status === 'rest'
-                        ? 'border-[#a44200] bg-[#a44200] cursor-not-allowed'
-                        : 'border-[#072ac8] hover:border-[#072ac8]/70'
-                    }`}
-                  >
-                    {getStatusIcon(day.workout.status)}
-                  </button>
+                  {/* LOC-22: Workout info - now supports multiple workouts */}
+                  {hasWorkoutsForDay && (
+                    <div className="space-y-2">
+                      {day.workouts.map((workout, idx) => (
+                        <div key={workout.id} className={`${idx > 0 ? 'pt-1 border-t border-gray-200' : ''}`}>
+                          <div className={`text-xs font-medium flex items-center gap-1 ${
+                            workout.status === 'completed' ? 'text-[#8eb19d]' :
+                            workout.status === 'rest' ? 'text-[#a44200]' :
+                            'text-[#072ac8]'
+                          }`}>
+                            {/* LOC-22: Show AM/PM indicator when multiple workouts */}
+                            {hasMultiple && (
+                              <span className="text-[10px] text-gray-500">
+                                {idx === 0 ? 'AM' : 'PM'}
+                              </span>
+                            )}
+                            {workout.type}
+                          </div>
+                          {workout.distance && (
+                            <div className="text-xs text-[#1e1b18]/70">{workout.distance}</div>
+                          )}
 
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(day.workout.id);
-                    }}
-                    className="p-1 text-[#1e1b18]/60 hover:text-[#072ac8] hover:bg-[#eacdc2] rounded transition-colors"
-                    aria-label="Edit workout"
-                  >
-                    <Edit2 className="w-3 h-3" />
-                  </button>
-                  
-                  <div className={`ml-auto w-2 h-2 rounded-full ${getWorkoutDotColor(day.workout.status)}`} />
-                </div>
-              </div>
-            )}
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 pt-1">
+                            {/* LOC-20: Only show toggle button for non-rest workouts */}
+                            {workout.status !== 'rest' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onToggle(workout.id);
+                                }}
+                                className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
+                                  workout.status === 'completed'
+                                    ? 'border-[#8eb19d] bg-[#8eb19d]'
+                                    : 'border-[#072ac8] hover:border-[#072ac8]/70'
+                                }`}
+                              >
+                                {getStatusIcon(workout.status)}
+                              </button>
+                            )}
+
+                            {/* LOC-20: Edit button always shown (allows editing rest days) */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit(workout.id);
+                              }}
+                              className="p-1 text-[#1e1b18]/60 hover:text-[#072ac8] hover:bg-[#eacdc2] rounded transition-colors"
+                              aria-label="Edit workout"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+
+                            <div className={`ml-auto w-2 h-2 rounded-full ${getWorkoutDotColor(workout.status)}`} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

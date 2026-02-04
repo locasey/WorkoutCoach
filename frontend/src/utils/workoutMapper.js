@@ -147,6 +147,8 @@ export function mapWorkoutToDesign(dbWorkout) {
     heartRateZone: deriveHeartRateZone(dbWorkout.type),
     notes: dbWorkout.notes || '',
     scheduledDate: dbWorkout.scheduled_date || null, // For date-based features like "today" highlighting
+    // LOC-22: Slot for multiple workouts per day (null=single, 1=AM, 2=PM)
+    slot: dbWorkout.slot || null,
     // Keep original data for editing
     _original: dbWorkout
   };

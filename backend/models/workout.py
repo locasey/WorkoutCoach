@@ -16,6 +16,7 @@ class Workout(Base):
     workout_plan_id = Column(UUID(as_uuid=True), ForeignKey('workout_plans.id'), nullable=False)
     week = Column(Integer, nullable=False)  # 1-based week number
     day = Column(Integer, nullable=False)  # 1-7, where 1=Monday
+    slot = Column(Integer, nullable=True)  # NULL=single workout, 1=AM/first, 2=PM/second (max 2 per day)
     type = Column(String(50), nullable=False)  # long_run, tempo, intervals, easy_run, rest, cross_training
     distance_km = Column(Float, nullable=True)
     duration_minutes = Column(Integer, nullable=True)
@@ -37,6 +38,7 @@ class Workout(Base):
             'workout_plan_id': str(self.workout_plan_id),
             'week': self.week,
             'day': self.day,
+            'slot': self.slot,
             'type': self.type,
             'distance_km': self.distance_km,
             'duration_minutes': self.duration_minutes,

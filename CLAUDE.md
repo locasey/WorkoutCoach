@@ -170,6 +170,9 @@ The backend follows a service-oriented architecture:
 **Workout Editing**:
 - `PUT /api/workouts/<id>/complete` - Toggle workout completion status
 - `PUT /api/workouts/<id>` - Update workout fields (partial updates supported)
+- `DELETE /api/workouts/<id>` - Delete workout (demotes remaining slot on multi-workout days)
+- `POST /api/workouts/day` - Add workout to a day (auto slot: 1=AM, 2=PM)
+- `GET /api/workouts/day/<date>` - Get all workouts for a specific date
 
 **Strava**:
 - `GET /api/strava/auth` - Get OAuth authorization URL
@@ -311,6 +314,7 @@ The `LLMService` abstracts provider differences:
 - `workout_plan_id` (UUID, FK → workout_plans)
 - `week_number` (Integer)
 - `day_of_week` (Integer, 0=Monday)
+- `slot` (Integer, nullable) - NULL=single, 1=AM/first, 2=PM/second (max 2 per day)
 - `date` (Date, nullable)
 - `workout_type` (String) - e.g., "long_run", "tempo", "intervals", "rest"
 - `distance` (Float, nullable)

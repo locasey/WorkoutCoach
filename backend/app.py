@@ -22,6 +22,9 @@ from logging_config import setup_logging, get_logger, log_api_request, log_strav
 
 load_dotenv()
 
+# Feature flags (LOC-23)
+STRAVA_ENABLED = os.getenv('STRAVA_ENABLED', 'false').lower() == 'true'
+
 # Initialize logging
 setup_logging()
 logger = get_logger('app')
@@ -689,10 +692,24 @@ def update_workout(workout_id):
 # Strava Integration Endpoints (Phase 6: Secure Session Management)
 # ============================================================================
 
+
+def check_strava_enabled():
+    """
+    Guard function to return 404 if Strava feature is disabled.
+
+    Returns 404 (not 403) to avoid revealing that Strava routes exist
+    when the feature is disabled - prevents reconnaissance vectors.
+    See LOC-23 documentation for rationale.
+    """
+    if not STRAVA_ENABLED:
+        from flask import abort
+        abort(404)
+
 @app.route('/api/strava/auth', methods=['GET'])
 @require_auth
 def strava_auth():
     """Initiate Strava OAuth flow"""
+    check_strava_enabled()
     log_strava_operation("auth_init", "Starting OAuth flow")
     auth_url = strava_service.get_authorization_url()
     return jsonify({"auth_url": auth_url})
@@ -701,6 +718,7 @@ def strava_auth():
 @app.route('/api/strava/callback', methods=['GET'])
 def strava_callback():
     """Handle Strava OAuth callback with server-side token storage"""
+    check_strava_enabled()
     try:
         code = request.args.get('code')
         error = request.args.get('error')
@@ -804,6 +822,7 @@ def strava_callback():
 @require_auth
 def validate_strava_connection():
     """Validate Strava connection and return athlete info"""
+    check_strava_enabled()
     try:
         session_token = get_strava_session_token()
         if not session_token:
@@ -847,6 +866,7 @@ def validate_strava_connection():
 @require_auth
 def strava_logout():
     """Log out from Strava (delete server-side session)"""
+    check_strava_enabled()
     try:
         session_token = get_strava_session_token()
         if not session_token:
@@ -870,6 +890,7 @@ def strava_logout():
 @require_auth
 def get_strava_activities():
     """Fetch and import activities from Strava"""
+    check_strava_enabled()
     try:
         session_token = get_strava_session_token()
         if not session_token:
@@ -909,6 +930,7 @@ def get_strava_activities():
 @require_auth
 def get_stored_activities():
     """Get activities stored in the database (no Strava API call)"""
+    check_strava_enabled()
     try:
         limit = request.args.get('limit', type=int, default=100)
         offset = request.args.get('offset', type=int, default=0)
@@ -935,6 +957,7 @@ def get_stored_activities():
 @require_auth
 def link_activity_to_workout(activity_id):
     """Link a Strava activity to a planned workout"""
+    check_strava_enabled()
     try:
         data = request.json
         workout_id = data.get('workout_id')
@@ -968,6 +991,7 @@ def link_activity_to_workout(activity_id):
 @require_auth
 def unlink_activity(activity_id):
     """Unlink a Strava activity from its workout"""
+    check_strava_enabled()
     try:
         db = next(get_db())
         try:
@@ -993,6 +1017,7 @@ def unlink_activity(activity_id):
 @require_auth
 def import_strava_activities():
     """Import selected activities (legacy endpoint - now auto-imports on fetch)"""
+    check_strava_enabled()
     try:
         data = request.json
         activity_ids = data.get('activity_ids', [])

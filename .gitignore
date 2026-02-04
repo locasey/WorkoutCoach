@@ -26,6 +26,7 @@ dist-ssr/
 .env
 .env.local
 .env.*.local
+config.json
 
 # IDE
 .vscode/
@@ -48,3 +49,6 @@ logs/
 
 # Claude Code temp files
 tmpclaude-*
+
+#Docs 
+docs/archived/

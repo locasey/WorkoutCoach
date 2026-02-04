@@ -1,5 +1,11 @@
 A local todo for the user - Liam 
 
+TODO:
+1. Get claude code to recognize MCP for Linear 
+
+
+###THIS CAN BE MOVED TO LINEAR
+
 Todo:
 1. Implement the RAG to enhance workouts
 2. Implement workout editing abilities

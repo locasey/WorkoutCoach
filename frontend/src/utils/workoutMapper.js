@@ -146,6 +146,7 @@ export function mapWorkoutToDesign(dbWorkout) {
     intensity: deriveIntensity(dbWorkout.type),
     heartRateZone: deriveHeartRateZone(dbWorkout.type),
     notes: dbWorkout.notes || '',
+    scheduledDate: dbWorkout.scheduled_date || null, // For date-based features like "today" highlighting
     // Keep original data for editing
     _original: dbWorkout
   };

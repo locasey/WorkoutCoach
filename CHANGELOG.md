@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Plan Management Usability (LOC-13)**
+  - Workout plan `name` field: backend column + migration with backfill (goal or "Plan - Mon YYYY"), auto-name on create
+  - PATCH `/api/workout-plans/<id>` to update plan name (max 255 chars)
+  - Plans tab: two-level flow (default = Manage Active Plan; "Manage All Plans" shows all plans grid); tab label "Plans" with ClipboardList icon
+  - Inline plan name editing in PlanCard and ActivePlanView (pencil, Enter/Escape)
+  - `ConfirmModal.jsx` – reusable confirmation dialog; plan delete uses it instead of `window.confirm`
+  - `frontend/src/utils/dateUtils.js` – shared `formatDate()` used by PlanCard and ActivePlanView
 - **Authentication System**: Simple username/password auth with session management
   - Backend: `auth_service.py` with session tokens, 24h expiry, `@require_auth` decorator
   - Frontend: `LoginPage.jsx` with form, auth state in `App.jsx`
@@ -44,6 +51,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CloudFront CDN**: SSL termination and caching for frontend at `workoutcoach.liamocasey.com`
 
 ### Changed
+- **Strava Feature Flag (LOC-23)**: Strava integration now disabled by default via `STRAVA_ENABLED` (backend) and `VITE_STRAVA_ENABLED` (frontend) env vars. All code intact for future re-enablement.
+- **Plans tab flow**: Manage Active Plan is now the default view; "Manage All Plans" button opens the full plan list; "Back to Active Plan" returns from All Plans
+- **Plans tab**: Nav label "Settings" → "Plans"; icon Settings → ClipboardList (key remains `plans`)
+- **Delete plan**: Confirmation via in-app modal (ConfirmModal) instead of browser `window.confirm`
+- **Alembic**: Replaced manual name migration with `c4e8f2b3d5a6_add_name_to_workout_plans.py` (proper 12-char revision ID, same backfill)
 - All API routes now protected with `@require_auth` (except `/api/health`)
 - CORS config reads from `CORS_ORIGINS` env var (comma-separated)
 - Strava OAuth callback uses `FRONTEND_URL` env var
@@ -55,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Global Styles**: Updated `index.css` and `App.css` with a modernized design system and CSS variables.
 
 ### Security
+- **Strava routes (LOC-23)**: Return 404 (not 403) when feature disabled to prevent route enumeration
 - Session tokens use `secrets.token_urlsafe(32)` for cryptographic randomness
 - Constant-time credential comparison via `secrets.compare_digest`
 - Auth cookies: `httponly=True`, `secure=True` (production), `samesite=Lax`
@@ -62,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Critical**: Fixed blank screen bug caused by undefined `swipeHandlers` in WeekAheadView - `useSwipeable` hook was imported but never called.
+- **LOC-21**: Fixed NaN display in mobile day picker - now shows workout duration (e.g., "30min"), distance (e.g., "6km"), "Rest", or "--" instead of broken date numbers.
 - Improved mobile responsiveness across all main views.
 - Optimized touch targets for accessibility and ease of use on small screens.
 - Removed unnecessary container and header borders in Week view for cleaner UI.

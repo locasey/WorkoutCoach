@@ -7,8 +7,11 @@ import { PlanManager } from './components/PlanManager/PlanManager'
 import { ToastProvider } from './components/Toast'
 import LoginPage from './components/LoginPage'
 import { API_BASE_URL } from './config/api'
-import { LayoutGrid, Calendar, MessageSquare, Activity, Settings, LogOut } from 'lucide-react'
+import { LayoutGrid, Calendar, MessageSquare, Activity, ClipboardList, LogOut } from 'lucide-react'
 import './App.css'
+
+// Feature flags - Strava integration disabled by default (LOC-23)
+const STRAVA_ENABLED = import.meta.env.VITE_STRAVA_ENABLED === 'true'
 
 // Configure axios base URL for production
 if (API_BASE_URL) {
@@ -68,6 +71,13 @@ function App() {
 
     checkAuth()
   }, [])
+
+  // Redirect to 'week' if Strava tab selected but feature disabled (LOC-23)
+  useEffect(() => {
+    if (!STRAVA_ENABLED && activeTab === 'strava') {
+      setActiveTab('week')
+    }
+  }, [activeTab])
 
   // Handle successful login
   const handleLogin = (sessionToken) => {
@@ -155,16 +165,18 @@ function App() {
               <MessageSquare className="w-5 h-5" aria-hidden />
               <span>Coach</span>
             </button>
-            <button
-              id="desktop-tab-strava"
-              role="tab"
-              aria-selected={activeTab === 'strava'}
-              className={activeTab === 'strava' ? 'active' : ''}
-              onClick={() => setActiveTab('strava')}
-            >
-              <Activity className="w-5 h-5" aria-hidden />
-              <span>Strava</span>
-            </button>
+            {STRAVA_ENABLED && (
+              <button
+                id="desktop-tab-strava"
+                role="tab"
+                aria-selected={activeTab === 'strava'}
+                className={activeTab === 'strava' ? 'active' : ''}
+                onClick={() => setActiveTab('strava')}
+              >
+                <Activity className="w-5 h-5" aria-hidden />
+                <span>Strava</span>
+              </button>
+            )}
             <button
               id="desktop-tab-plans"
               role="tab"
@@ -172,8 +184,8 @@ function App() {
               className={activeTab === 'plans' ? 'active' : ''}
               onClick={() => setActiveTab('plans')}
             >
-              <Settings className="w-5 h-5" aria-hidden />
-              <span>Settings</span>
+              <ClipboardList className="w-5 h-5" aria-hidden />
+              <span>Plans</span>
             </button>
           </nav>
         </header>
@@ -183,7 +195,7 @@ function App() {
           {activeTab === 'month' && <WeekAheadView initialView="month" />}
           {activeTab === 'chat' && <ChatInterface />}
           {activeTab === 'plans' && <PlanManager />}
-          {activeTab === 'strava' && <StravaImport />}
+          {STRAVA_ENABLED && activeTab === 'strava' && <StravaImport />}
         </main>
 
         <nav className="bottom-nav" role="tablist">
@@ -217,16 +229,18 @@ function App() {
             <MessageSquare className="w-6 h-6" />
             <span>Coach</span>
           </button>
-          <button
-            id="tab-strava"
-            role="tab"
-            aria-selected={activeTab === 'strava'}
-            className={activeTab === 'strava' ? 'active' : ''}
-            onClick={() => setActiveTab('strava')}
-          >
-            <Activity className="w-6 h-6" />
-            <span>Strava</span>
-          </button>
+          {STRAVA_ENABLED && (
+            <button
+              id="tab-strava"
+              role="tab"
+              aria-selected={activeTab === 'strava'}
+              className={activeTab === 'strava' ? 'active' : ''}
+              onClick={() => setActiveTab('strava')}
+            >
+              <Activity className="w-6 h-6" />
+              <span>Strava</span>
+            </button>
+          )}
           <button
             id="tab-plans"
             role="tab"
@@ -234,8 +248,8 @@ function App() {
             className={activeTab === 'plans' ? 'active' : ''}
             onClick={() => setActiveTab('plans')}
           >
-            <Settings className="w-6 h-6" />
-            <span>Settings</span>
+            <ClipboardList className="w-6 h-6" />
+            <span>Plans</span>
           </button>
         </nav>
       </div>

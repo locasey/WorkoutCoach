@@ -137,6 +137,8 @@ The backend follows a service-oriented architecture:
 **Components** (`frontend/src/components/`):
 - `WeekAheadView.jsx` - Main training dashboard with horizontal day picker (mobile) and weekly hero section.
 - `ChatInterface.jsx` - LLM chat for workout plan generation, plan management (view/activate/delete), Excel export.
+- `PlanManager/` - Plans tab: two-level flow (default = Manage Active Plan; "Manage All Plans" → All Plans grid; "Back to Active Plan" returns). PlanCard, PlanList, ActivePlanView, PlanUpload; inline plan name edit.
+- `ConfirmModal.jsx` - Reusable confirmation dialog (e.g. delete plan); replaces `window.confirm`.
 - `StravaImport.jsx` - Strava OAuth and activity data display.
 - `WorkoutCard.jsx` - High-contrast "sporty" component for workout details, showing Planned vs. Actual metrics.
 - `WorkoutEditModal.jsx` - Mobile-optimized bottom-sheet for editing workout details.
@@ -144,6 +146,7 @@ The backend follows a service-oriented architecture:
 
 **Utilities**:
 - `workoutMapper.js` - Maps workout types to display icons and colors
+- `dateUtils.js` - Shared `formatDate()` for display (e.g. PlanCard, ActivePlanView)
 
 **API Communication**: Components use `axios` for HTTP requests to backend endpoints
 
@@ -153,6 +156,7 @@ The backend follows a service-oriented architecture:
 - `POST /api/chat` - Generate new workout plan from chat message
 - `GET /api/workout-plans` - List all plans with metadata
 - `GET /api/workout-plans/active` - Get currently active plan
+- `PATCH /api/workout-plans/<id>` - Update plan (e.g. `name`); max 255 chars
 - `POST /api/workout-plans/<id>/activate` - Set plan as active (deactivates others)
 - `DELETE /api/workout-plans/<id>` - Delete plan (cannot delete active plan)
 - `GET /api/export/excel/<id>` - Download plan as Excel file
@@ -279,6 +283,10 @@ The `LLMService` abstracts provider differences:
 ## Notes on Current Implementation
 
 - **Single user MVP**: `user_id` is nullable and set to `None` throughout. Multi-user support is future work.
+- **Strava feature flag**: Strava integration is disabled by default via `STRAVA_ENABLED` (backend) and `VITE_STRAVA_ENABLED` (frontend) env vars. When disabled:
+  - Frontend: Strava tab hidden from navigation, component not rendered
+  - Backend: All `/api/strava/*` routes return 404 (not 403) to avoid revealing route existence
+  - To re-enable: Set both env vars to `true` and restart services
 - **Strava activities**: Still stored in-memory (`imported_activities` list in app.py). Not yet migrated to database.
 - **Week calculations**: Week starts on Monday (ISO 8601). `get_week_start_end()` and `get_week_by_offset()` in `WorkoutPlanService`.
 - **Frontend state**: Minimal state management, mostly component-level state. No Redux or global state library.
@@ -289,6 +297,7 @@ The `LLMService` abstracts provider differences:
 **workout_plans**:
 - `id` (UUID, PK)
 - `user_id` (Integer, nullable)
+- `name` (String(255), nullable) - User-facing plan name; auto-set on create from goal or "Plan - Mon YYYY"
 - `goal` (Text) - Training goal description
 - `duration_weeks` (Integer)
 - `start_date` (Date, nullable)
@@ -310,3 +319,35 @@ The `LLMService` abstracts provider differences:
 - `notes` (Text, nullable)
 - `is_completed` (Boolean, default False)
 - `completed_at` (DateTime, nullable)
+
+## Git Configuration (Windows-specific)
+
+### Preventing Common Git Issues on Windows
+
+**Line Ending Configuration**
+To avoid LF/CRLF warnings, ensure the `.gitattributes` file exists in the project root with:
+```
+* text=auto
+*.md text
+*.json text
+*.jsx text
+*.js text
+*.css text
+*.py text
+*.html text
+```
+
+**Git Add Commands**
+- ✅ **Always use**: `git add .` 
+- ❌ **Never use**: `git add *` (causes "invalid path 'nul'" error on Windows due to reserved filenames)
+
+**Why**: On Windows, `git add *` expands through the shell and can include reserved names like `nul`, `con`, `prn`, etc. Using `git add .` lets Git handle the operation internally, avoiding this issue.
+
+**One-time Git Config (optional)**
+```powershell
+# Configure Git to handle line endings automatically
+git config --global core.autocrlf true
+
+# Set default branch name
+git config --global init.defaultBranch main
+```

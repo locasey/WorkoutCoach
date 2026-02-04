@@ -448,19 +448,25 @@ export function WeekAheadView({ initialView = 'week' }) {
           {/* Day Picker */}
           <div className="day-picker">
             {workouts.map((workout, index) => {
-              const date = new Date(workout.scheduledDate);
-              const dayNum = date.getDate();
               const isToday = isTodayInWeek(workout.scheduledDate);
               const isActive = selectedDayIndex === index;
-              
+
+              // Display workout metric: duration > distance > Rest > --
+              const getDisplayValue = () => {
+                if (workout.status === 'rest') return 'Rest';
+                if (workout.duration) return workout.duration.replace(' ', ''); // "30 min" -> "30min"
+                if (workout.distance) return workout.distance; // Already "6km"
+                return '--';
+              };
+
               return (
-                <div 
-                  key={workout.id} 
+                <div
+                  key={workout.id}
                   className={`day-item ${isActive ? 'active' : ''} ${isToday ? 'today' : ''}`}
                   onClick={() => setSelectedDayIndex(index)}
                 >
                   <span className="day-name">{workout.day}</span>
-                  <span className="day-number">{dayNum}</span>
+                  <span className="day-number">{getDisplayValue()}</span>
                   <div className={`day-status-indicator status-${workout.status}`} />
                 </div>
               );

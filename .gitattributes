@@ -1,0 +1,10 @@
+# Create .gitattributes to handle line endings automatically
+@"
+* text=auto
+*.md text
+*.json text
+*.jsx text
+*.css text
+*.js text
+*.py text
+"@ | Out-File -FilePath ".gitattributes" -Encoding utf8

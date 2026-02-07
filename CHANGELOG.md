@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Architecture Roadmap Phase 1: Foundation**
+  - `frontend/src/styles/tokens.css` - Design system tokens (spacing scale, typography, borders, shadows, z-index)
+  - `frontend/src/api/routes.js` - Centralized API endpoint paths with query param builder
+  - `frontend/src/api/queryClient.js` - React Query v5 config with sensible defaults + query key factories
+  - `frontend/src/components/WeekView/` - Shell component for new unified week view (Phase 3 implementation)
+  - `@tanstack/react-query@^5` added to frontend dependencies
 - **Multiple Workouts Per Day (LOC-22)**
   - New `slot` column on workouts table: NULL=single, 1=AM, 2=PM (max 2 per day)
   - `POST /api/workouts/day` - Add workout to a day with auto slot assignment
@@ -60,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CloudFront CDN**: SSL termination and caching for frontend at `workoutcoach.liamocasey.com`
 
 ### Changed
+- `main.jsx` now wraps App with `QueryClientProvider` for React Query support
+- `index.css` imports design tokens from `styles/tokens.css`
 - **Strava Feature Flag (LOC-23)**: Strava integration now disabled by default via `STRAVA_ENABLED` (backend) and `VITE_STRAVA_ENABLED` (frontend) env vars. All code intact for future re-enablement.
 - **Plans tab flow**: Manage Active Plan is now the default view; "Manage All Plans" button opens the full plan list; "Back to Active Plan" returns from All Plans
 - **Plans tab**: Nav label "Settings" → "Plans"; icon Settings → ClipboardList (key remains `plans`)

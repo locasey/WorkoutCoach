@@ -1,0 +1,3 @@
+[submodule ".claude/plugins/locasey-skills"]
+	path = .claude/plugins/locasey-skills
+	url = https://github.com/locasey/claude-skills.git

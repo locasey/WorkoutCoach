@@ -1,0 +1,156 @@
+/**
+ * Design Tokens
+ *
+ * Centralized design system tokens for consistent spacing, typography,
+ * and visual properties across the Workout Coach application.
+ *
+ * Usage: Import this file in index.css or component stylesheets.
+ * Variables are defined on :root for global access.
+ *
+ * @see docs/ARCHITECTURE_ROADMAP.md - Design System Notes
+ */
+
+:root {
+  /* ==========================================================================
+   * SPACING SCALE
+   *
+   * 4px base unit system. Use these for margins, padding, and gaps.
+   * Naming convention: --space-{multiplier}
+   * ========================================================================== */
+
+  --space-0: 0;
+  --space-1: 4px;      /* Tight spacing - icon padding, inline elements */
+  --space-2: 8px;      /* Default small - button padding, list items */
+  --space-3: 12px;     /* Medium-small - card padding, form fields */
+  --space-4: 16px;     /* Default medium - section padding, gaps */
+  --space-5: 20px;     /* Medium-large - component margins */
+  --space-6: 24px;     /* Large - card margins, section gaps */
+  --space-8: 32px;     /* Extra large - major section padding */
+  --space-10: 40px;    /* 2x large - page padding */
+  --space-12: 48px;    /* 3x large - hero sections */
+  --space-16: 64px;    /* 4x large - major page divisions */
+  --space-20: 80px;    /* Massive - splash/landing sections */
+  --space-24: 96px;    /* Maximum - full-bleed sections */
+
+  /* ==========================================================================
+   * TYPOGRAPHY SCALE
+   *
+   * Modular scale based on 1rem (16px) base.
+   * Use --text-{size} for font-size, pair with appropriate line-height.
+   * ========================================================================== */
+
+  --text-xs: 0.75rem;     /* 12px - Labels, captions, metadata */
+  --text-sm: 0.875rem;    /* 14px - Secondary text, helper text */
+  --text-base: 1rem;      /* 16px - Body text (default) */
+  --text-lg: 1.125rem;    /* 18px - Large body, emphasized text */
+  --text-xl: 1.25rem;     /* 20px - Subheadings, card titles */
+  --text-2xl: 1.5rem;     /* 24px - Section headings */
+  --text-3xl: 1.875rem;   /* 30px - Page headings */
+  --text-4xl: 2.25rem;    /* 36px - Hero headings */
+  --text-5xl: 3rem;       /* 48px - Display headings */
+
+  /* Line heights - pair with text sizes */
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+  --leading-loose: 2;
+
+  /* Font weights */
+  --font-light: 300;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* ==========================================================================
+   * BORDER RADIUS
+   *
+   * Consistent corner rounding across components.
+   * ========================================================================== */
+
+  --radius-none: 0;
+  --radius-sm: 4px;       /* Buttons, inputs, small cards */
+  --radius-md: 8px;       /* Cards, modals */
+  --radius-lg: 12px;      /* Large cards, containers */
+  --radius-xl: 16px;      /* Hero sections, featured content */
+  --radius-2xl: 24px;     /* Pills, tags, badges */
+  --radius-full: 9999px;  /* Circles, fully rounded buttons */
+
+  /* ==========================================================================
+   * SHADOWS
+   *
+   * Elevation system for depth hierarchy.
+   * ========================================================================== */
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+  /* ==========================================================================
+   * Z-INDEX SCALE
+   *
+   * Layering system for overlays and modals.
+   * ========================================================================== */
+
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-fixed: 300;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-tooltip: 700;
+  --z-toast: 800;
+  --z-max: 9999;
+
+  /* ==========================================================================
+   * BREAKPOINTS (for reference - use in media queries)
+   *
+   * These are documented here for reference. Use in media queries like:
+   * @media (min-width: 768px) { ... }
+   * ========================================================================== */
+
+  /*
+   * --breakpoint-sm: 640px;   Mobile landscape
+   * --breakpoint-md: 768px;   Tablet portrait
+   * --breakpoint-lg: 1024px;  Tablet landscape / small desktop
+   * --breakpoint-xl: 1280px;  Desktop
+   * --breakpoint-2xl: 1536px; Large desktop
+   */
+}
+
+/* ==========================================================================
+ * UTILITY CLASSES
+ *
+ * Common spacing utilities using the token system.
+ * Use sparingly - prefer component-specific styles.
+ * ========================================================================== */
+
+/* Spacing utilities - margin */
+.m-0 { margin: var(--space-0); }
+.m-1 { margin: var(--space-1); }
+.m-2 { margin: var(--space-2); }
+.m-3 { margin: var(--space-3); }
+.m-4 { margin: var(--space-4); }
+.m-6 { margin: var(--space-6); }
+.m-8 { margin: var(--space-8); }
+
+/* Spacing utilities - padding */
+.p-0 { padding: var(--space-0); }
+.p-1 { padding: var(--space-1); }
+.p-2 { padding: var(--space-2); }
+.p-3 { padding: var(--space-3); }
+.p-4 { padding: var(--space-4); }
+.p-6 { padding: var(--space-6); }
+.p-8 { padding: var(--space-8); }
+
+/* Gap utilities - for flex/grid */
+.gap-1 { gap: var(--space-1); }
+.gap-2 { gap: var(--space-2); }
+.gap-3 { gap: var(--space-3); }
+.gap-4 { gap: var(--space-4); }
+.gap-6 { gap: var(--space-6); }
+.gap-8 { gap: var(--space-8); }

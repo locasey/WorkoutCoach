@@ -1,0 +1,241 @@
+/**
+ * WeekView Styles
+ *
+ * Styling for the new unified WeekView component.
+ * Uses design tokens from styles/tokens.css for consistency.
+ *
+ * BEM naming convention: .week-view__element--modifier
+ *
+ * @see styles/tokens.css for spacing/typography tokens
+ * @see docs/ARCHITECTURE_ROADMAP.md for design system notes
+ */
+
+/* ==========================================================================
+ * CONTAINER
+ * ========================================================================== */
+
+.week-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--gray-100);
+  padding: var(--space-4);
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .week-view {
+    padding: var(--space-6);
+    gap: var(--space-6);
+  }
+}
+
+/* ==========================================================================
+ * HEADER
+ * ========================================================================== */
+
+.week-view__header {
+  background: var(--pure-white);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+
+.week-view__header-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.week-view__title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--carbon-black);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+.week-view__subtitle {
+  font-size: var(--text-base);
+  color: var(--gray-600);
+  margin: 0;
+}
+
+.week-view__phase-focus {
+  display: inline-block;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--persian-blue);
+  background: rgba(0, 71, 255, 0.1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  margin-top: var(--space-2);
+  width: fit-content;
+}
+
+/* ==========================================================================
+ * NAVIGATION
+ * ========================================================================== */
+
+.week-view__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+}
+
+.week-view__nav-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--pure-white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.week-view__nav-button:hover {
+  background: var(--gray-100);
+  color: var(--carbon-black);
+  border-color: var(--gray-400);
+}
+
+.week-view__nav-button:focus-visible {
+  outline: 2px solid var(--persian-blue);
+  outline-offset: 2px;
+}
+
+.week-view__nav-current {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--carbon-black);
+}
+
+/* ==========================================================================
+ * DAYS GRID (Placeholder for Phase 3)
+ * ========================================================================== */
+
+.week-view__days {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.week-view__placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--pure-white);
+  border: 2px dashed var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--gray-600);
+  gap: var(--space-4);
+}
+
+.week-view__placeholder h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--carbon-black);
+  margin: 0;
+}
+
+.week-view__placeholder p {
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  max-width: 400px;
+  margin: 0;
+}
+
+.week-view__checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.week-view__checklist li {
+  color: var(--success-green);
+  font-weight: var(--font-medium);
+}
+
+/* ==========================================================================
+ * ACTIONS FOOTER
+ * ========================================================================== */
+
+.week-view__actions {
+  display: flex;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--gray-200);
+}
+
+.week-view__action-button {
+  flex: 1;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: none;
+}
+
+.week-view__action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.week-view__action-button--primary {
+  background: var(--persian-blue);
+  color: var(--pure-white);
+}
+
+.week-view__action-button--primary:hover:not(:disabled) {
+  background: #0038cc; /* Darker blue */
+}
+
+.week-view__action-button--secondary {
+  background: var(--pure-white);
+  color: var(--carbon-black);
+  border: 1px solid var(--gray-200);
+}
+
+.week-view__action-button--secondary:hover:not(:disabled) {
+  background: var(--gray-100);
+  border-color: var(--gray-400);
+}
+
+/* ==========================================================================
+ * RESPONSIVE ADJUSTMENTS
+ * ========================================================================== */
+
+@media (max-width: 640px) {
+  .week-view__title {
+    font-size: var(--text-xl);
+  }
+
+  .week-view__nav-button span {
+    /* Hide text on small screens, show only icons */
+    display: none;
+  }
+
+  .week-view__nav-button {
+    padding: var(--space-2);
+  }
+}

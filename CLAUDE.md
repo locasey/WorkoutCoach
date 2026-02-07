@@ -8,6 +8,90 @@ You are technical, but your role is to assist me (head of product) as I drive pr
 
 Your goals are: ship fast, maintain clean code, keep infra costs low, and avoid regressions.
 
+# Workout Coach — Master Principles
+
+> Ship the core loop first. Everything else is a distraction until users exist.
+
+---
+
+## 🚧 Scope Discipline (Read Before Adding Features)
+
+This product succeeds by shipping the core weekly coaching loop — not by being “complete.”
+
+### The only must-have flow:
+
+**Goal → Generate Week → Do Workouts → Regenerate → Repeat**
+
+Everything else is optional polish.
+
+If a feature does not directly improve:
+- weekly clarity  
+- adherence  
+- or plan quality  
+
+…it does not belong in v1.
+
+---
+
+## ⏱ Default Answer to New Ideas
+
+When a new feature feels exciting:
+
+> **Not now — ship first.**
+
+Add it to a backlog instead of the roadmap.
+
+Shipping a simple product beats designing a perfect one that never launches.
+
+---
+
+## 🎯 MVP Success Criteria
+
+v1 is successful if users can:
+
+- Set a training goal (or stay in maintenance)
+- See a clean weekly plan
+- Complete workouts
+- Regenerate intelligently
+
+That’s it.
+
+**Explicitly out of scope for v1:**
+- reflections & journaling  
+- social features  
+- advanced analytics  
+- integrations (Strava, wearables, etc.)  
+
+---
+
+## 🧠 Builder Reminder
+
+> Complexity feels like progress. Shipping is progress.
+
+Every extra system:
+- increases bugs  
+- slows iteration  
+- delays real feedback  
+
+Keep the coach simple. Let users pull the product forward.
+
+---
+
+## 📦 Feature Parking Lot (Add ideas to Linear not parking lot)
+
+(Review only after v1 is live.)
+
+---
+
+## ✅ Before Adding Any New Feature, Ask:
+
+1. Does this directly improve this week’s training experience?
+2. Does it unblock shipping?
+3. Would I still build this if I had 7 days left?
+
+If not — it waits.
+
+
 ## Our Stack
 
 - **Frontend**: Vite, React
@@ -40,9 +124,44 @@ Your goals are: ship fast, maintain clean code, keep infra costs low, and avoid 
 
 ---
 
+## Product Vision & Direction
+
+> **Mantra:** "Plan your work, work your plan"
+
+Workout Coach is your personal coach that adapts to your context:
+
+- **Training for a race?** It keeps you accountable with a periodized plan (base → build → peak → taper), while letting you adjust based on how you feel.
+- **Between goals?** It gives you smart weekly suggestions to stay fit without rigid commitment.
+
+### Two Operating Modes
+
+| Mode | Trigger | Coach Behavior |
+|------|---------|----------------|
+| **Training Block** | User sets race goal + date | Periodized plan (Lydiard/Daniels-style), phase awareness, accountability |
+| **Maintenance** | No active goal | Week-by-week suggestions, casual |
+
+### Core Principles
+
+1. **Week is the atomic unit** - Everything centers on "this week"
+2. **Two modes, one coach** - Training Block (accountability) vs. Maintenance (flexibility)
+3. **Friction for plan changes** - Easy to adjust a workout, harder to restructure phases
+4. **Tracking is out of scope** - Strava/Garmin handle that; we focus on planning
+
+### Architecture Roadmap
+
+See `docs/ARCHITECTURE_ROADMAP.md` for the full execution plan. Key changes:
+- `WorkoutPlan` model → `TrainingBlock` model (with phases)
+- Chat-based plan generation → Guided `GoalSetup` flow
+- `WeekAheadView` (300+ lines) → Smaller, composable `WeekView` components
+- `PlanManager` folder → `BlockOverview` (simpler)
+
+---
+
 ## Project Overview
 
-Workout Coach is a locally hosted web application that generates personalized workout plans through a chat interface powered by LLMs (Gemini or OpenAI) and integrates with Strava for activity data import. The application uses a PostgreSQL database to persist workout plans and individual workouts.
+Workout Coach is a web application that generates personalized workout plans powered by LLMs (Gemini or OpenAI). The application uses a PostgreSQL database to persist training blocks and individual workouts.
+
+**Note:** Strava integration is disabled and preserved for future use. The app focuses on planning, not tracking.
 
 ## Development Commands
 
@@ -285,15 +404,21 @@ The `LLMService` abstracts provider differences:
 
 ## Notes on Current Implementation
 
-- **Single user MVP**: `user_id` is nullable and set to `None` throughout. Multi-user support is future work.
-- **Strava feature flag**: Strava integration is disabled by default via `STRAVA_ENABLED` (backend) and `VITE_STRAVA_ENABLED` (frontend) env vars. When disabled:
-  - Frontend: Strava tab hidden from navigation, component not rendered
-  - Backend: All `/api/strava/*` routes return 404 (not 403) to avoid revealing route existence
-  - To re-enable: Set both env vars to `true` and restart services
-- **Strava activities**: Still stored in-memory (`imported_activities` list in app.py). Not yet migrated to database.
+### What's Changing (see `docs/ARCHITECTURE_ROADMAP.md`)
+- **Data model:** `WorkoutPlan` → `TrainingBlock` with phase support
+- **Frontend:** `WeekAheadView` is being replaced with composable `WeekView` components
+- **Plan creation:** Chat interface → Guided `GoalSetup` flow
+- **State management:** Adding React Query for data fetching
+
+### Current State (Legacy)
+- **Single user MVP**: `user_id` is nullable and set to `None` throughout. Multi-user support is Phase 5.
+- **Strava disabled**: Feature flag disabled via `STRAVA_ENABLED` env vars. Code preserved, not deleted.
 - **Week calculations**: Week starts on Monday (ISO 8601). `get_week_start_end()` and `get_week_by_offset()` in `WorkoutPlanService`.
-- **Frontend state**: Minimal state management, mostly component-level state. No Redux or global state library.
-- **Excel export**: Uses `openpyxl` to create formatted workbooks with workout schedules by week.
+- **Frontend state**: Component-level state only. React Query will be added in Phase 1.
+- **Known pain points**:
+  - `WeekAheadView.jsx` (300+ lines) - does too much, hard to modify
+  - `PlanManager/` - complex two-level navigation
+  - Spacing inconsistent across components
 
 ## Database Schema
 

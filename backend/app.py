@@ -11,6 +11,7 @@ from services.llm_service import LLMService
 from services.excel_service import ExcelService
 from services.strava_service import StravaService
 from services.workout_plan_service import WorkoutPlanService
+from services.training_block_service import TrainingBlockService
 from services.strava_activity_service import StravaActivityService
 from services.auth_service import (
     require_auth, is_auth_enabled, validate_credentials,
@@ -475,6 +476,218 @@ def delete_workout_plan(plan_id):
             db.close()
     except Exception as e:
         log_error("Error deleting workout plan", e)
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# Training Block API Endpoints (New Architecture)
+# ============================================================================
+
+@app.route('/api/training-block', methods=['GET'])
+@require_auth
+def get_training_block():
+    """Get the current active training block (or null if in maintenance mode)"""
+    try:
+        db = next(get_db())
+        try:
+            block = TrainingBlockService.get_active_block(db, user_id=None)
+
+            if not block:
+                return jsonify({
+                    "block": None,
+                    "mode": "maintenance",
+                    "message": "No active training block - in maintenance mode"
+                }), 200
+
+            return jsonify({
+                "block": block.to_dict(),
+                "mode": "training",
+                "message": "Active training block retrieved"
+            })
+        finally:
+            db.close()
+    except Exception as e:
+        log_error("Error getting training block", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/training-block', methods=['POST'])
+@require_auth
+def create_training_block():
+    """Create a new training block (starts training mode)"""
+    try:
+        data = request.get_json()
+
+        required_fields = ['event_name', 'event_distance', 'target_date', 'total_weeks', 'phase_map']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+
+        db = next(get_db())
+        try:
+            from datetime import datetime
+            target_date = datetime.strptime(data['target_date'], '%Y-%m-%d').date()
+            start_date = None
+            if data.get('start_date'):
+                start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+
+            block = TrainingBlockService.create_training_block(
+                db=db,
+                event_name=data['event_name'],
+                event_distance=data['event_distance'],
+                target_date=target_date,
+                total_weeks=data['total_weeks'],
+                phase_map=data['phase_map'],
+                start_date=start_date,
+                user_id=None
+            )
+
+            logger.info(f"Created training block: {block.id} for {data['event_name']}")
+            return jsonify({
+                "block": block.to_dict(),
+                "message": "Training block created successfully"
+            }), 201
+        finally:
+            db.close()
+    except Exception as e:
+        log_error("Error creating training block", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/training-block/<block_id>', methods=['PUT'])
+@require_auth
+def update_training_block(block_id):
+    """Update a training block"""
+    try:
+        data = request.get_json()
+        db = next(get_db())
+        try:
+            block_uuid = uuid.UUID(block_id)
+            block = TrainingBlockService.update_training_block(db, block_uuid, **data)
+
+            if not block:
+                return jsonify({"error": "Training block not found"}), 404
+
+            logger.info(f"Updated training block: {block_id}")
+            return jsonify({
+                "block": block.to_dict(),
+                "message": "Training block updated successfully"
+            })
+        except ValueError as e:
+            return jsonify({"error": f"Invalid block ID: {str(e)}"}), 400
+        finally:
+            db.close()
+    except Exception as e:
+        log_error("Error updating training block", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/training-block/<block_id>/phases', methods=['PUT'])
+@require_auth
+def update_training_block_phases(block_id):
+    """Update the phase structure of a training block"""
+    try:
+        data = request.get_json()
+
+        if 'phase_map' not in data:
+            return jsonify({"error": "Missing required field: phase_map"}), 400
+
+        db = next(get_db())
+        try:
+            block_uuid = uuid.UUID(block_id)
+            block = TrainingBlockService.update_phases(db, block_uuid, data['phase_map'])
+
+            if not block:
+                return jsonify({"error": "Training block not found"}), 404
+
+            logger.info(f"Updated phases for training block: {block_id}")
+            return jsonify({
+                "block": block.to_dict(),
+                "message": "Training block phases updated successfully"
+            })
+        except ValueError as e:
+            return jsonify({"error": f"Invalid block ID: {str(e)}"}), 400
+        finally:
+            db.close()
+    except Exception as e:
+        log_error("Error updating training block phases", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/training-block/<block_id>', methods=['DELETE'])
+@require_auth
+def delete_training_block(block_id):
+    """End a training block (abandon it)"""
+    try:
+        data = request.get_json() or {}
+        completed = data.get('completed', False)
+
+        db = next(get_db())
+        try:
+            block_uuid = uuid.UUID(block_id)
+            block = TrainingBlockService.end_training_block(db, block_uuid, completed=completed)
+
+            if not block:
+                return jsonify({"error": "Training block not found"}), 404
+
+            status = "completed" if completed else "abandoned"
+            logger.info(f"Ended training block: {block_id} (status: {status})")
+            return jsonify({
+                "block": block.to_dict(),
+                "message": f"Training block {status}"
+            })
+        except ValueError as e:
+            return jsonify({"error": f"Invalid block ID: {str(e)}"}), 400
+        finally:
+            db.close()
+    except Exception as e:
+        log_error("Error ending training block", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/training-block/<block_id>/overview', methods=['GET'])
+@require_auth
+def get_training_block_overview(block_id):
+    """Get full training block overview for visualization"""
+    try:
+        db = next(get_db())
+        try:
+            block_uuid = uuid.UUID(block_id)
+            overview = TrainingBlockService.get_block_overview(db, block_uuid)
+
+            if not overview:
+                return jsonify({"error": "Training block not found"}), 404
+
+            return jsonify(overview)
+        except ValueError as e:
+            return jsonify({"error": f"Invalid block ID: {str(e)}"}), 400
+        finally:
+            db.close()
+    except Exception as e:
+        log_error("Error getting training block overview", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/week', methods=['GET'])
+@require_auth
+def get_week_view():
+    """
+    Get unified weekly view (works for both training and maintenance modes).
+
+    Query params:
+        offset: Week offset from current (0=current, -1=last week, +1=next week)
+    """
+    try:
+        offset = request.args.get('offset', 0, type=int)
+
+        db = next(get_db())
+        try:
+            context = TrainingBlockService.get_week_context(db, week_offset=offset, user_id=None)
+            return jsonify(context)
+        finally:
+            db.close()
+    except Exception as e:
+        log_error("Error getting week view", e)
         return jsonify({"error": str(e)}), 500
 
 

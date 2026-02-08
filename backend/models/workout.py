@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, Float, String, Date, Boolean, DateTime, Text, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -13,8 +13,10 @@ class Workout(Base):
     __tablename__ = 'workouts'
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    workout_plan_id = Column(UUID(as_uuid=True), ForeignKey('workout_plans.id'), nullable=False)
+    workout_plan_id = Column(UUID(as_uuid=True), ForeignKey('workout_plans.id'), nullable=True)  # Legacy, nullable for new architecture
+    training_block_id = Column(UUID(as_uuid=True), ForeignKey('training_blocks.id'), nullable=True)  # New architecture
     week = Column(Integer, nullable=False)  # 1-based week number
+    phase = Column(String(20), nullable=True)  # "base", "build", "peak", "taper" (null for maintenance)
     day = Column(Integer, nullable=False)  # 1-7, where 1=Monday
     slot = Column(Integer, nullable=True)  # NULL=single workout, 1=AM/first, 2=PM/second (max 2 per day)
     type = Column(String(50), nullable=False)  # long_run, tempo, intervals, easy_run, rest, cross_training
@@ -27,18 +29,24 @@ class Workout(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationship to workout plan
+
+    # Actuals - logged data after workout completion
+    actuals = Column(JSONB, nullable=True)  # {"distance": 6.5, "duration": 52, "notes": "Felt great"}
+
+    # Relationships
     workout_plan = relationship("WorkoutPlan", back_populates="workouts")
+    training_block = relationship("TrainingBlock", back_populates="workouts")
     
     def to_dict(self):
         """Convert model to dictionary"""
         return {
             'id': str(self.id),
-            'workout_plan_id': str(self.workout_plan_id),
+            'workout_plan_id': str(self.workout_plan_id) if self.workout_plan_id else None,
+            'training_block_id': str(self.training_block_id) if self.training_block_id else None,
             'week': self.week,
             'day': self.day,
             'slot': self.slot,
+            'phase': self.phase,
             'type': self.type,
             'distance_km': self.distance_km,
             'duration_minutes': self.duration_minutes,
@@ -48,6 +56,7 @@ class Workout(Base):
             'is_completed': self.is_completed,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'actuals': self.actuals
         }
 

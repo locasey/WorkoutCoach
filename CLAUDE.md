@@ -8,6 +8,8 @@ You are technical, but your role is to assist me (head of product) as I drive pr
 
 Your goals are: ship fast, maintain clean code, keep infra costs low, and avoid regressions.
 
+UPDATE (2/8/26): We are under increasing pressure from investors to ship our MVP. The head of product has reported issues with AI agent usage and is quickly hitting limits before developing new features. Before working on any task make sure the most usage-effective model is selected for a task. Consider having simpler models work on simpler parts of a phase and handing off more complex parts to other models. Leverage the docs to work on development with different models sequentially, not necessarily in parallel, unless the team is confident there isn't a risk merging working on the features in parallel.  
+
 # Workout Coach — Master Principles
 
 > Ship the core loop first. Everything else is a distraction until users exist.
@@ -237,8 +239,10 @@ The backend follows a service-oriented architecture:
 - One-to-many relationship: WorkoutPlan → Workouts (with cascade delete)
 
 **Services** (`backend/services/`):
-- `llm_service.py` - Abstracts LLM providers (Gemini/OpenAI), generates structured workout plans from chat messages
+- `llm_service.py` - Abstracts LLM providers (Gemini/OpenAI), generates structured workout plans from chat messages + `generate_periodized_workouts()` for phase-specific generation
 - `workout_plan_service.py` - Business logic for workout CRUD, plan activation, week/month queries, progress tracking
+- `training_block_service.py` - TrainingBlock CRUD, week context calculation, block overview with phase status, `regenerate_week()` (snapshot + delete + LLM regen for a single week)
+- `periodized_workout_service.py` - Orchestrates phase-by-phase LLM workout generation for training blocks
 - `excel_service.py` - Generates formatted Excel exports using openpyxl
 - `strava_service.py` - OAuth flow and activity fetching from Strava API
 
@@ -250,22 +254,26 @@ The backend follows a service-oriented architecture:
 ### Frontend Architecture (React)
 
 **Entry Point**: `frontend/src/App.jsx`
-- Tab-based navigation between three main views
-- Manages active tab state (week/chat/strava)
+- Tab-based navigation: Week, Coach, Plans (+ Strava if enabled)
+- Coach tab is state-aware: no block → GoalSetup; active block → Week + RegenerateModal
+- Queries active training block via React Query for state detection
+- Month tab removed; Plans tab renders BlockOverview
 
 **Components** (`frontend/src/components/`):
-- `WeekAheadView.jsx` - Main training dashboard with horizontal day picker (mobile) and weekly hero section.
-- `ChatInterface.jsx` - LLM chat for workout plan generation, plan management (view/activate/delete), Excel export.
-- `PlanManager/` - Plans tab: two-level flow (default = Manage Active Plan; "Manage All Plans" → All Plans grid; "Back to Active Plan" returns). PlanCard, PlanList, ActivePlanView, PlanUpload; inline plan name edit.
-- `ConfirmModal.jsx` - Reusable confirmation dialog (e.g. delete plan); replaces `window.confirm`.
-- `StravaImport.jsx` - Strava OAuth and activity data display.
+- `WeekView/` - Unified weekly training view with React Query. Subcomponents: WeekHeader (phase/mode context), DayCard (single day with workouts), WeekNav (prev/next navigation), WeekActions (Regenerate/Add buttons).
+- `GoalSetup/` - 3-step modal wizard for creating training blocks: ModeSelect (training vs maintenance), RaceDetails (event/distance/date/experience form), PhasePreview (visual timeline with +/- adjustment). Triggers block creation + LLM workout generation.
+- `BlockOverview/` - Plans tab: phase timeline bars, completion stats, progress bar, "End Training Block" with ConfirmModal.
+- `RegenerateModal.jsx` - Coach-style warning modal before regenerating a week. Optional reason textarea, spinner during LLM call.
+- `ConfirmModal.jsx` - Reusable confirmation dialog (e.g. delete plan, end block); replaces `window.confirm`.
+- `StravaImport.jsx` - Strava OAuth and activity data display (disabled by default).
 - `WorkoutCard.jsx` - High-contrast "sporty" component for workout details, showing Planned vs. Actual metrics.
 - `WorkoutEditModal.jsx` - Mobile-optimized bottom-sheet for editing workout details.
-- `MonthView.jsx` - Calendar month view of workouts.
+- **Deleted**: `ChatInterface.jsx`, `WeekAheadView.jsx`, `MonthView.jsx`, `PlanManager/` (replaced by GoalSetup, WeekView, BlockOverview).
 
 **Utilities**:
 - `workoutMapper.js` - Maps workout types to display icons and colors
 - `dateUtils.js` - Shared `formatDate()` for display (e.g. PlanCard, ActivePlanView)
+- `phaseCalculator.js` - `calculatePhaseMap(totalWeeks)`, `adjustPhaseMap()`, `calculateTotalWeeks()`, `PHASE_INFO` constants
 
 **API Communication**: Components use `axios` for HTTP requests to backend endpoints
 
@@ -292,6 +300,17 @@ The backend follows a service-oriented architecture:
 - `DELETE /api/workouts/<id>` - Delete workout (demotes remaining slot on multi-workout days)
 - `POST /api/workouts/day` - Add workout to a day (auto slot: 1=AM, 2=PM)
 - `GET /api/workouts/day/<date>` - Get all workouts for a specific date
+
+**Training Block (New Architecture)**:
+- `GET /api/training-block` - Get active block (null = maintenance mode)
+- `POST /api/training-block` - Create new block (auto-deactivates existing)
+- `PUT /api/training-block/<id>` - Update block details
+- `PUT /api/training-block/<id>/phases` - Adjust phase structure
+- `DELETE /api/training-block/<id>` - End block (complete or abandon)
+- `GET /api/training-block/<id>/overview` - Block visualization with stats
+- `POST /api/training-block/<id>/generate-workouts` - LLM generates periodized workouts (phase-by-phase)
+- `GET /api/week?offset=N` - Unified weekly view (training + maintenance modes)
+- `POST /api/week/regenerate` - Regenerate week: snapshots old workouts, LLM generates new ones. Body: `{ "week_offset": 0, "reason": "optional" }`
 
 **Strava**:
 - `GET /api/strava/auth` - Get OAuth authorization URL
@@ -405,24 +424,38 @@ The `LLMService` abstracts provider differences:
 ## Notes on Current Implementation
 
 ### What's Changing (see `docs/ARCHITECTURE_ROADMAP.md`)
-- **Data model:** `WorkoutPlan` → `TrainingBlock` with phase support
-- **Frontend:** `WeekAheadView` is being replaced with composable `WeekView` components
-- **Plan creation:** Chat interface → Guided `GoalSetup` flow
-- **State management:** Adding React Query for data fetching
+- **Data model:** `WorkoutPlan` → `TrainingBlock` with phase support ✅ (Phase 2)
+- **Frontend:** `WeekAheadView` replaced by composable `WeekView` components ✅ (Phase 3)
+- **Plan creation:** Chat interface → Guided `GoalSetup` flow ✅ (Phase 4)
+- **State management:** React Query for data fetching ✅ (Phase 1)
+- **Regenerate:** `POST /api/week/regenerate` with snapshot history ✅ (Phase 5)
+- **Plans tab:** `PlanManager/` → `BlockOverview` with phase timeline ✅ (Phase 5)
+- **Deprecated components deleted:** ChatInterface, WeekAheadView, MonthView, PlanManager ✅ (Phase 5)
+- **Remaining:** Multi-user support (Phase 6)
 
-### Current State (Legacy)
-- **Single user MVP**: `user_id` is nullable and set to `None` throughout. Multi-user support is Phase 5.
+### Current State
+- **Single user MVP**: `user_id` is nullable and set to `None` throughout. Multi-user support is Phase 6.
 - **Strava disabled**: Feature flag disabled via `STRAVA_ENABLED` env vars. Code preserved, not deleted.
-- **Week calculations**: Week starts on Monday (ISO 8601). `get_week_start_end()` and `get_week_by_offset()` in `WorkoutPlanService`.
-- **Frontend state**: Component-level state only. React Query will be added in Phase 1.
-- **Known pain points**:
-  - `WeekAheadView.jsx` (300+ lines) - does too much, hard to modify
-  - `PlanManager/` - complex two-level navigation
-  - Spacing inconsistent across components
+- **Week calculations**: Week starts on Monday (ISO 8601). Unified view via `TrainingBlockService.get_week_context()`.
+- **Frontend state**: React Query for server state; component state for UI.
+- **Legacy data preserved**: Old WorkoutPlan data and endpoints kept for prompt engineering reference. Backend endpoints still functional.
 
 ## Database Schema
 
-**workout_plans**:
+**training_blocks**:
+- `id` (UUID, PK)
+- `user_id` (Integer, nullable)
+- `event_name` (String(255)) - e.g., "Boston Marathon"
+- `event_distance` (String(50)) - "marathon", "half", "10k", "5k", or custom
+- `target_date` (Date) - Race day
+- `start_date` (Date) - When training begins
+- `total_weeks` (Integer)
+- `phase_map` (JSONB) - `{"base": [1,2,3,4], "build": [5,6,7,8], ...}`
+- `week_snapshots` (JSONB, nullable) - Regeneration history per week (max 3 snapshots per week, FIFO)
+- `status` (Enum: active/completed/abandoned)
+- `created_at`, `updated_at` (DateTime)
+
+**workout_plans** (Legacy - kept for reference):
 - `id` (UUID, PK)
 - `user_id` (Integer, nullable)
 - `name` (String(255), nullable) - User-facing plan name; auto-set on create from goal or "Plan - Mon YYYY"

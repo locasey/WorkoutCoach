@@ -1,0 +1,122 @@
+/**
+ * WeekActions Styles
+ *
+ * Styling for the week action buttons.
+ * Uses design tokens from styles/tokens.css for consistency.
+ *
+ * BEM naming convention: .week-actions__element--modifier
+ */
+
+/* ==========================================================================
+ * CONTAINER
+ * ========================================================================== */
+
+.week-actions {
+  display: flex;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--gray-200);
+  margin-top: auto;
+}
+
+/* ==========================================================================
+ * ACTION BUTTONS
+ * ========================================================================== */
+
+.week-actions__button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: none;
+}
+
+.week-actions__button:focus-visible {
+  outline: 2px solid var(--persian-blue);
+  outline-offset: 2px;
+}
+
+.week-actions__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Primary Button (e.g., Add Workout) */
+.week-actions__button--primary {
+  background: var(--persian-blue);
+  color: var(--pure-white);
+}
+
+.week-actions__button--primary:hover:not(:disabled) {
+  background: #0038cc; /* Darker blue */
+}
+
+.week-actions__button--primary:active:not(:disabled) {
+  background: #002db3; /* Even darker */
+}
+
+/* Secondary Button (e.g., Regenerate) */
+.week-actions__button--secondary {
+  background: var(--pure-white);
+  color: var(--carbon-black);
+  border: 1px solid var(--gray-200);
+}
+
+.week-actions__button--secondary:hover:not(:disabled) {
+  background: var(--gray-100);
+  border-color: var(--gray-400);
+}
+
+.week-actions__button--secondary:active:not(:disabled) {
+  background: var(--gray-200);
+}
+
+/* ==========================================================================
+ * ICONS
+ * ========================================================================== */
+
+.week-actions__icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.week-actions__icon--spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+ * RESPONSIVE ADJUSTMENTS
+ * ========================================================================== */
+
+@media (max-width: 480px) {
+  .week-actions {
+    flex-direction: column;
+  }
+
+  .week-actions__button {
+    width: 100%;
+  }
+}
+
+@media (min-width: 768px) {
+  .week-actions__button {
+    padding: var(--space-4);
+  }
+}

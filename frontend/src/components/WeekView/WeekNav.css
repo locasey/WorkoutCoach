@@ -1,0 +1,145 @@
+/**
+ * WeekNav Styles
+ *
+ * Styling for the week navigation component.
+ * Uses design tokens from styles/tokens.css for consistency.
+ *
+ * BEM naming convention: .week-nav__element--modifier
+ */
+
+/* ==========================================================================
+ * CONTAINER
+ * ========================================================================== */
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+  gap: var(--space-2);
+}
+
+/* ==========================================================================
+ * NAVIGATION BUTTONS
+ * ========================================================================== */
+
+.week-nav__button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--pure-white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.week-nav__button:hover:not(:disabled) {
+  background: var(--gray-100);
+  color: var(--carbon-black);
+  border-color: var(--gray-400);
+}
+
+.week-nav__button:focus-visible {
+  outline: 2px solid var(--persian-blue);
+  outline-offset: 2px;
+}
+
+.week-nav__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.week-nav__icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.week-nav__button-text {
+  /* Hide on small screens, show only on larger */
+}
+
+/* ==========================================================================
+ * CURRENT WEEK INDICATOR
+ * ========================================================================== */
+
+.week-nav__current {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--gray-100);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.week-nav__current--active {
+  background: rgba(0, 71, 255, 0.08);
+  border: 1px solid rgba(0, 71, 255, 0.2);
+}
+
+.week-nav__current-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--gray-600);
+  flex-shrink: 0;
+}
+
+.week-nav__current--active .week-nav__current-icon {
+  color: var(--persian-blue);
+}
+
+.week-nav__current-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.week-nav__current-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--carbon-black);
+}
+
+.week-nav__current--active .week-nav__current-label {
+  color: var(--persian-blue);
+}
+
+.week-nav__current-range {
+  font-size: var(--text-xs);
+  color: var(--gray-400);
+}
+
+/* ==========================================================================
+ * RESPONSIVE ADJUSTMENTS
+ * ========================================================================== */
+
+@media (max-width: 640px) {
+  .week-nav__button-text {
+    /* Hide text on small screens, show only icons */
+    display: none;
+  }
+
+  .week-nav__button {
+    padding: var(--space-2);
+  }
+
+  .week-nav__current-info {
+    display: none;
+  }
+
+  .week-nav__current {
+    padding: var(--space-2);
+  }
+}
+
+@media (min-width: 641px) {
+  .week-nav {
+    gap: var(--space-4);
+  }
+}

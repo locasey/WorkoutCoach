@@ -12,8 +12,10 @@ import './WorkoutCard.css';
  * @param {boolean} isToday - Whether this workout is for today
  * @param {boolean} isAM - LOC-22: Whether this is the AM/first slot in a multi-workout day
  * @param {boolean} isPM - LOC-22: Whether this is the PM/second slot in a multi-workout day
+ * @param {string} [phase] - Training phase ('base', 'build', 'peak', 'taper') - Phase 3
+ * @param {Object} [actuals] - Actual workout data (distance, duration, pace) - Phase 3
  */
-export function WorkoutCard({ workout, onToggle, onEdit, isToday = false, isAM = false, isPM = false }) {
+export function WorkoutCard({ workout, onToggle, onEdit, isToday = false, isAM = false, isPM = false, phase, actuals }) {
   const [justCompleted, setJustCompleted] = useState(false);
 
   // Track when workout status changes to completed
@@ -60,6 +62,12 @@ export function WorkoutCard({ workout, onToggle, onEdit, isToday = false, isAM =
             Today
           </div>
         )}
+        {/* Phase badge for training mode - Phase 3 */}
+        {(phase || workout.phase) && (
+          <span className="phase-badge" data-phase={phase || workout.phase}>
+            {(phase || workout.phase).charAt(0).toUpperCase() + (phase || workout.phase).slice(1)}
+          </span>
+        )}
       </div>
 
       {!isEmpty ? (
@@ -83,7 +91,10 @@ export function WorkoutCard({ workout, onToggle, onEdit, isToday = false, isAM =
             <div className="metrics-group">
               <div className="metrics-label">Actual</div>
               <div className="metrics-row">
-                <span className="actual-value">--</span>
+                {/* Phase 3: Show actuals when available */}
+                <span className={`actual-value ${(actuals?.distance || workout.actuals?.distance) ? 'active' : ''}`}>
+                  {actuals?.distance || workout.actuals?.distance || '--'}
+                </span>
               </div>
             </div>
           </div>

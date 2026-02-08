@@ -8,6 +8,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `CoachMenu` component — bottom-sheet (mobile) / modal (desktop) with 3 options: Regenerate Week, Start New Block, Adjust Phases
+- Mobile day-picker in `WeekView` — horizontal scrollable day pills + single DayCard hero below 768px
+- `.week-view__empty-cta` CSS for maintenance mode CTA button
+
+### Changed
+- `WeekHeader` simplified — single-line "Week 8/16 . Build Phase", removed phase focus badge and lucide icons, reduced padding
+- `WeekHeader` maintenance mode — "This Week" + date inline, "Just Staying Fit" subtitle
+- Coach tab now opens `CoachMenu` (3 options) instead of directly triggering RegenerateModal
+- Maintenance empty state messaging — "Maintenance Mode" with friendlier copy
+
+### Fixed
+- **Critical**: `get_week_context()` leaked ALL workouts by date range — now filters by `training_block_id` (training mode) or orphan workouts only (maintenance mode)
+
+### Added (prior)
+- **Architecture Roadmap Phase 5: Polish & Cleanup**
+  - `POST /api/week/regenerate` endpoint — snapshots existing workouts (max 3 per week, FIFO), deletes old, LLM generates fresh week respecting phase
+  - `week_snapshots` JSONB column on `training_blocks` (migration: `h2i3j4k5l6m7`)
+  - `TrainingBlockService.regenerate_week()` — orchestrates snapshot + delete + generate for a single week
+  - `RegenerateModal.jsx` + CSS — coach-style modal with optional reason textarea, spinner, Escape/backdrop close
+  - `BlockOverview/` component — phase timeline bars, completion stats, progress bar, "End Training Block" action
+  - Coach tab is now **state-aware**: no block → GoalSetup; active block → Week tab + RegenerateModal
+  - Plans tab renders `BlockOverview` instead of PlanManager
+
+### Changed
+- **App.jsx**: Removed Month tab from nav; removed ChatInterface/PlanManager/StravaImport/WeekAheadView imports; added `useQuery` for active block detection; lifted `showRegenerate` state to App and passed as props to WeekView
+- **WeekView.jsx**: Wired regenerate mutation (`useMutation` → `POST /api/week/regenerate`); accepts `showRegenerate`/`setShowRegenerate` props; added toast feedback on success/error
+- **WeekActions.jsx**: Now receives `isRegenerating` prop to show spinner during regeneration
+- **LLM prompt** (`llm_service.py`): Added "EXACTLY ONE workout per day, 7 per week" rules to prevent multi-workout-per-day generation
+- **routes.js**: Fixed `TRAINING_BLOCK.OVERVIEW` to accept block ID; marked CHAT and WORKOUT_PLANS sections as `(Deprecated)`
+
+### Removed
+- `ChatInterface.jsx` + CSS — replaced by GoalSetup
+- `WeekAheadView.jsx` — replaced by WeekView
+- `MonthView.jsx` — removed from nav
+- `PlanManager/` folder (PlanManager, PlanCard, PlanList, ActivePlanView, PlanUpload) — replaced by BlockOverview
+- Month tab from desktop and mobile navigation
+
+### Fixed
+- LLM generating 4 workouts per day instead of 1 (prompt constraint added)
+- "Regenerate Week" button was a no-op (now functional with snapshot + LLM regen)
+- Coach tab always opened GoalSetup even with active block (now state-aware)
+- Plans tab showed legacy PlanManager (now shows BlockOverview)
+- Week number calculation for regeneration when block `start_date` falls mid-calendar-week
+
+- **Architecture Roadmap Phase 4: Goal Setup Flow**
+  - `GoalSetup/GoalSetup.jsx` - 3-step modal wizard (Mode Select → Race Details → Phase Preview → Generate)
+  - `GoalSetup/ModeSelect.jsx` - "Train for a Race" vs "Just Staying Fit" card selection
+  - `GoalSetup/RaceDetails.jsx` - Form: event name, distance dropdown, date picker (4-52 week validation), experience level radio cards
+  - `GoalSetup/PhasePreview.jsx` - Colored phase timeline bar, week ranges, inline +/- phase adjustment with constraints
+  - `GoalSetup/GoalSetup.css` - Full modal styling (follows ConfirmModal patterns)
+  - `utils/phaseCalculator.js` - `calculatePhaseMap(totalWeeks)` distributes weeks across base/build/peak/taper; `adjustPhaseMap()` for constrained adjustment; `PHASE_INFO` display constants
+  - `backend/services/periodized_workout_service.py` - Orchestrates phase-by-phase LLM workout generation, calculates `scheduled_date`, bulk-inserts workouts
+  - `LLMService.generate_periodized_workouts()` - Phase-specific LLM prompting (distance, focus, experience level); supports Gemini and OpenAI
+  - `POST /api/training-block/:id/generate-workouts` - Endpoint: generates periodized workouts for a block (accepts `experience_level`)
+  - `GENERATE_WORKOUTS` route added to `api/routes.js`
+  - "Start Training Block" CTA button in WeekAheadView and WeekView empty states
+- **Architecture Roadmap Phase 3: Frontend Core (WeekView Components)**
+  - `WeekHeader.jsx` + CSS - Context-aware header (training mode: "Week 8 · Build Phase" with countdown; maintenance: simplified)
+  - `DayCard.jsx` + CSS - Single day container with 0-2 workouts, AM/PM slot support, today highlight
+  - `WeekNav.jsx` + CSS - Week navigation (prev/next buttons, current week indicator, date range display)
+  - `WeekActions.jsx` + CSS - Footer actions (Regenerate Week button, Add Workout button, loading states)
+  - `WeekView.jsx` fully implemented with React Query (`useQuery` for `/api/week`, `useMutation` for complete/add)
+  - Phase badges on WorkoutCard (base/build/peak/taper with phase-specific colors)
+  - Actuals vs Planned metrics display on WorkoutCard
+  - Loading, error, and empty state handling in WeekView
 - **Architecture Roadmap Phase 1: Foundation**
   - `frontend/src/styles/tokens.css` - Design system tokens (spacing scale, typography, borders, shadows, z-index)
   - `frontend/src/api/routes.js` - Centralized API endpoint paths with query param builder
@@ -80,6 +145,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CloudFront CDN**: SSL termination and caching for frontend at `workoutcoach.liamocasey.com`
 
 ### Changed
+- **App.jsx**: "Coach" tab now opens GoalSetup modal instead of ChatInterface; added `showGoalSetup` state; `Target` icon replaces `MessageSquare` for Coach nav
+- **WeekAheadView.jsx**: Accepts `onStartTraining` prop; empty state CTA says "Start Training Block" and opens GoalSetup
+- **WeekView.jsx**: Accepts `onStartTraining` prop; empty state updated with `Target` icon and "Start Training Block" CTA
+- **WorkoutCard.jsx**: Added `phase` and `actuals` props for training block support; displays phase badge in header
+- **WorkoutCard.css**: Added phase badge styling with phase-specific colors (base=sage, build=blue, peak=orange, taper=green)
+- **WeekView/index.js**: Updated exports to include all new subcomponents (WeekHeader, DayCard, WeekNav, WeekActions)
 - `main.jsx` now wraps App with `QueryClientProvider` for React Query support
 - `index.css` imports design tokens from `styles/tokens.css`
 - **Workout model**: `workout_plan_id` now nullable (supports new architecture alongside legacy)

@@ -120,16 +120,120 @@
 }
 
 /* ==========================================================================
- * DAYS GRID (Placeholder for Phase 3)
+ * DAYS GRID
  * ========================================================================== */
 
-.week-view__days {
+.week-view__days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-3);
+  flex: 1;
+}
+
+/* Hide desktop grid on mobile (day-picker replaces it) */
+@media (max-width: 767px) {
+  .week-view__days-grid {
+    display: none;
+  }
+}
+
+/* Two columns on tablet */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .week-view__days-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ==========================================================================
+ * LOADING STATE
+ * ========================================================================== */
+
+.week-view__loading {
   flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--pure-white);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  gap: var(--space-4);
+  color: var(--gray-600);
 }
 
-.week-view__placeholder {
+.week-view__loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--persian-blue);
+  border-radius: 50%;
+  animation: spinner 0.8s linear infinite;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+ * ERROR STATE
+ * ========================================================================== */
+
+.week-view__error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--pure-white);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  text-align: center;
+  gap: var(--space-3);
+}
+
+.week-view__error-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--error-red);
+}
+
+.week-view__error h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--carbon-black);
+  margin: 0;
+}
+
+.week-view__error p {
+  font-size: var(--text-sm);
+  color: var(--gray-600);
+  margin: 0;
+}
+
+.week-view__error-retry {
+  padding: var(--space-2) var(--space-4);
+  background: var(--persian-blue);
+  color: var(--pure-white);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-top: var(--space-2);
+}
+
+.week-view__error-retry:hover {
+  background: #0038cc;
+}
+
+/* ==========================================================================
+ * EMPTY STATE
+ * ========================================================================== */
+
+.week-view__empty {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -144,34 +248,40 @@
   gap: var(--space-4);
 }
 
-.week-view__placeholder h2 {
+.week-view__empty-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--gray-300);
+}
+
+.week-view__empty h2 {
   font-size: var(--text-xl);
   font-weight: var(--font-semibold);
   color: var(--carbon-black);
   margin: 0;
 }
 
-.week-view__placeholder p {
+.week-view__empty p {
   font-size: var(--text-sm);
   line-height: var(--leading-relaxed);
   max-width: 400px;
   margin: 0;
 }
 
-.week-view__checklist {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.week-view__empty-cta {
+  padding: var(--space-3) var(--space-5);
+  background: var(--persian-blue);
+  color: var(--pure-white);
+  border: none;
+  border-radius: var(--radius-md);
   font-size: var(--text-sm);
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
-.week-view__checklist li {
-  color: var(--success-green);
-  font-weight: var(--font-medium);
+.week-view__empty-cta:hover {
+  background: #0038cc;
 }
 
 /* ==========================================================================
@@ -237,5 +347,95 @@
 
   .week-view__nav-button {
     padding: var(--space-2);
+  }
+}
+
+/* ==========================================================================
+ * MOBILE DAY PICKER
+ * ========================================================================== */
+
+.week-view__day-picker {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: var(--space-1) 0;
+}
+
+.week-view__day-picker::-webkit-scrollbar {
+  display: none;
+}
+
+.week-view__day-pill {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 56px;
+  padding: var(--space-2) var(--space-2);
+  background: var(--pure-white);
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.week-view__day-pill--active {
+  background: var(--carbon-black);
+  border-color: var(--carbon-black);
+  color: var(--pure-white);
+}
+
+.week-view__day-pill--today:not(.week-view__day-pill--active) {
+  border-color: var(--persian-blue);
+}
+
+.week-view__day-pill-name {
+  font-size: 10px;
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.week-view__day-pill--active .week-view__day-pill-name {
+  opacity: 1;
+  color: var(--pure-white);
+}
+
+.week-view__day-pill-num {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  line-height: 1;
+}
+
+.week-view__day-pill-metric {
+  font-size: 10px;
+  font-weight: var(--font-medium);
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.week-view__day-pill--active .week-view__day-pill-metric {
+  color: var(--pure-white);
+  opacity: 0.8;
+}
+
+/* Day Hero (selected day on mobile) */
+.week-view__day-hero {
+  flex: 1;
+}
+
+.week-view__day-hero .day-card {
+  min-height: 300px;
+}
+
+/* Hide day-picker on desktop */
+@media (min-width: 768px) {
+  .week-view__day-picker,
+  .week-view__day-hero {
+    display: none;
   }
 }

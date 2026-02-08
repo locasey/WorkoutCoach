@@ -1,0 +1,77 @@
+/**
+ * WeekHeader Styles
+ *
+ * Compact, context-aware weekly header.
+ * BEM naming convention: .week-header__element--modifier
+ */
+
+.week-header {
+  background: var(--pure-white);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.week-header__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Title */
+.week-header__title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--carbon-black);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+.week-header__phase {
+  color: var(--persian-blue);
+  font-weight: var(--font-semibold);
+}
+
+/* Countdown */
+.week-header__countdown {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--gray-600);
+  margin: 0;
+}
+
+/* Date range */
+.week-header__dates {
+  font-size: var(--text-xs);
+  color: var(--gray-400);
+  margin: 0;
+}
+
+/* Maintenance mode: title + date inline */
+.week-header__maintenance-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.week-header__dates--inline {
+  font-size: var(--text-sm);
+}
+
+.week-header__subtitle {
+  font-size: var(--text-sm);
+  color: var(--gray-600);
+  margin: 0;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .week-header {
+    padding: var(--space-3);
+  }
+
+  .week-header__title {
+    font-size: var(--text-lg);
+  }
+}

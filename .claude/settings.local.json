@@ -13,7 +13,12 @@
       "mcp__linear-server__list_issues",
       "mcp__linear-server__list_projects",
       "Bash(npm install:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(./venv/Scripts/python.exe:*)",
+      "Bash(python -m alembic revision:*)",
+      "Bash(curl:*)",
+      "Bash(python -c:*)",
+      "Bash(findstr:*)"
     ]
   }
 }

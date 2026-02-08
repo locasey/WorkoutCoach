@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
-import ChatInterface from './components/ChatInterface'
-import StravaImport from './components/StravaImport'
-import { WeekAheadView } from './components/WeekAheadView'
-import { PlanManager } from './components/PlanManager/PlanManager'
+import { useQuery } from '@tanstack/react-query'
+import { WeekView } from './components/WeekView'
+import { BlockOverview } from './components/BlockOverview'
+import { GoalSetup } from './components/GoalSetup'
+import { CoachMenu } from './components/CoachMenu'
 import { ToastProvider } from './components/Toast'
 import LoginPage from './components/LoginPage'
 import { API_BASE_URL } from './config/api'
-import { LayoutGrid, Calendar, MessageSquare, Activity, ClipboardList, LogOut } from 'lucide-react'
+import { queryKeys } from './api/queryClient'
+import { API_ROUTES } from './api/routes'
+import { LayoutGrid, Activity, ClipboardList, LogOut, Target } from 'lucide-react'
 import './App.css'
 
 // Feature flags - Strava integration disabled by default (LOC-23)
@@ -31,6 +34,9 @@ const setupAxiosAuth = (token) => {
 
 function App() {
   const [activeTab, setActiveTab] = useState('week')
+  const [showGoalSetup, setShowGoalSetup] = useState(false)
+  const [showRegenerate, setShowRegenerate] = useState(false)
+  const [showCoachMenu, setShowCoachMenu] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authChecking, setAuthChecking] = useState(true)
 
@@ -78,6 +84,31 @@ function App() {
       setActiveTab('week')
     }
   }, [activeTab])
+
+  // Query active training block for Coach tab state-awareness
+  const { data: blockData } = useQuery({
+    queryKey: queryKeys.trainingBlock.current,
+    queryFn: async () => {
+      const response = await axios.get(API_ROUTES.TRAINING_BLOCK.CURRENT)
+      return response.data
+    },
+    staleTime: 60 * 1000,
+    enabled: isAuthenticated,
+  })
+  const hasActiveBlock = !!blockData?.block
+
+  /**
+   * Coach tab: state-aware behavior
+   * - No active block -> open GoalSetup
+   * - Active block -> navigate to Week tab + open RegenerateModal
+   */
+  const handleCoachClick = () => {
+    if (hasActiveBlock) {
+      setShowCoachMenu(true)
+    } else {
+      setShowGoalSetup(true)
+    }
+  }
 
   // Handle successful login
   const handleLogin = (sessionToken) => {
@@ -133,7 +164,7 @@ function App() {
               <span>Sign Out</span>
             </button>
           </div>
-          {/* Desktop nav: horizontal tabs below title; visible only at ≥769px */}
+          {/* Desktop nav: horizontal tabs below title; visible only at >=769px */}
           <nav className="desktop-nav hidden md:flex" role="tablist" aria-label="Main navigation">
             <button
               id="desktop-tab-week"
@@ -146,23 +177,13 @@ function App() {
               <span>Week</span>
             </button>
             <button
-              id="desktop-tab-month"
+              id="desktop-tab-coach"
               role="tab"
-              aria-selected={activeTab === 'month'}
-              className={activeTab === 'month' ? 'active' : ''}
-              onClick={() => setActiveTab('month')}
+              aria-selected={false}
+              className=""
+              onClick={handleCoachClick}
             >
-              <Calendar className="w-5 h-5" aria-hidden />
-              <span>Month</span>
-            </button>
-            <button
-              id="desktop-tab-chat"
-              role="tab"
-              aria-selected={activeTab === 'chat'}
-              className={activeTab === 'chat' ? 'active' : ''}
-              onClick={() => setActiveTab('chat')}
-            >
-              <MessageSquare className="w-5 h-5" aria-hidden />
+              <Target className="w-5 h-5" aria-hidden />
               <span>Coach</span>
             </button>
             {STRAVA_ENABLED && (
@@ -191,12 +212,42 @@ function App() {
         </header>
 
         <main className="app-main" role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
-          {activeTab === 'week' && <WeekAheadView initialView="week" />}
-          {activeTab === 'month' && <WeekAheadView initialView="month" />}
-          {activeTab === 'chat' && <ChatInterface />}
-          {activeTab === 'plans' && <PlanManager />}
-          {STRAVA_ENABLED && activeTab === 'strava' && <StravaImport />}
+          {activeTab === 'week' && (
+            <WeekView
+              onStartTraining={() => setShowGoalSetup(true)}
+              showRegenerate={showRegenerate}
+              setShowRegenerate={setShowRegenerate}
+            />
+          )}
+          {activeTab === 'plans' && (
+            <BlockOverview onStartTraining={() => setShowGoalSetup(true)} />
+          )}
         </main>
+
+        {/* Goal Setup Modal */}
+        <GoalSetup
+          isOpen={showGoalSetup}
+          onClose={() => setShowGoalSetup(false)}
+        />
+
+        {/* Coach Menu (active block) */}
+        <CoachMenu
+          isOpen={showCoachMenu}
+          onClose={() => setShowCoachMenu(false)}
+          onRegenerate={() => {
+            setShowCoachMenu(false)
+            setActiveTab('week')
+            setShowRegenerate(true)
+          }}
+          onNewBlock={() => {
+            setShowCoachMenu(false)
+            setShowGoalSetup(true)
+          }}
+          onAdjustPhases={() => {
+            setShowCoachMenu(false)
+            setActiveTab('plans')
+          }}
+        />
 
         <nav className="bottom-nav" role="tablist">
           <button
@@ -210,23 +261,13 @@ function App() {
             <span>Week</span>
           </button>
           <button
-            id="tab-month"
+            id="tab-coach"
             role="tab"
-            aria-selected={activeTab === 'month'}
-            className={activeTab === 'month' ? 'active' : ''}
-            onClick={() => setActiveTab('month')}
+            aria-selected={false}
+            className=""
+            onClick={handleCoachClick}
           >
-            <Calendar className="w-6 h-6" />
-            <span>Month</span>
-          </button>
-          <button
-            id="tab-chat"
-            role="tab"
-            aria-selected={activeTab === 'chat'}
-            className={activeTab === 'chat' ? 'active' : ''}
-            onClick={() => setActiveTab('chat')}
-          >
-            <MessageSquare className="w-6 h-6" />
+            <Target className="w-6 h-6" />
             <span>Coach</span>
           </button>
           {STRAVA_ENABLED && (
@@ -258,4 +299,3 @@ function App() {
 }
 
 export default App
-

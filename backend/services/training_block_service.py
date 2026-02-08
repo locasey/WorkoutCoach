@@ -1,8 +1,10 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict, Any
 import uuid
+import json
+import copy
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -165,17 +167,26 @@ class TrainingBlockService:
         # Get active training block
         block = TrainingBlockService.get_active_block(db, user_id)
 
-        # Get workouts for this week
-        workout_query = db.query(Workout).filter(
-            and_(
-                Workout.scheduled_date >= week_start,
-                Workout.scheduled_date <= week_end
+        # Get workouts for this week, filtered by ownership
+        if block:
+            # Training mode: only workouts belonging to this block
+            workout_query = db.query(Workout).filter(
+                and_(
+                    Workout.training_block_id == block.id,
+                    Workout.scheduled_date >= week_start,
+                    Workout.scheduled_date <= week_end
+                )
             )
-        )
-        if user_id is not None:
-            # Filter by training_block's user_id or workout_plan's user_id
-            # For now, we'll get all workouts since user_id isn't on Workout directly
-            pass
+        else:
+            # Maintenance mode: only orphan workouts (no block, no legacy plan)
+            workout_query = db.query(Workout).filter(
+                and_(
+                    Workout.training_block_id.is_(None),
+                    Workout.workout_plan_id.is_(None),
+                    Workout.scheduled_date >= week_start,
+                    Workout.scheduled_date <= week_end
+                )
+            )
 
         workouts = workout_query.order_by(
             Workout.scheduled_date,
@@ -287,3 +298,142 @@ class TrainingBlockService:
             "completed_workouts": completed_workouts,
             "total_workouts": total_workouts
         }
+
+    @staticmethod
+    def regenerate_week(
+        db: Session,
+        block_id: uuid.UUID,
+        week_offset: int,
+        reason: str,
+        llm_service
+    ) -> Dict[str, Any]:
+        """
+        Regenerate workouts for a specific week of a training block.
+
+        1. Snapshot existing workouts (max 3 per week, FIFO)
+        2. Delete old workouts for that week
+        3. Call LLM for new workouts (single week, phase-aware)
+        4. Insert new workouts
+        5. Return updated week context
+
+        Args:
+            db: Database session
+            block_id: Training block UUID
+            week_offset: Week offset from current (0=current, -1=last, +1=next)
+            reason: Optional user reason for regeneration
+            llm_service: LLMService instance
+
+        Returns:
+            Updated week context dict
+        """
+        from services.periodized_workout_service import PeriodizedWorkoutService
+
+        block = db.query(TrainingBlock).filter(TrainingBlock.id == block_id).first()
+        if not block:
+            raise ValueError(f"Training block {block_id} not found")
+        if block.status != 'active':
+            raise ValueError(f"Training block is not active (status: {block.status})")
+
+        # Calculate target week date range
+        today = date.today()
+        target_date = today + timedelta(weeks=week_offset)
+        days_since_monday = target_date.weekday()
+        week_start = target_date - timedelta(days=days_since_monday)
+        week_end = week_start + timedelta(days=6)
+
+        # Calculate week number within the block
+        # Use the target_date (not week_start) to handle blocks that start mid-week
+        if not block.start_date:
+            raise ValueError("Training block has no start_date")
+        days_from_start = (target_date - block.start_date).days
+        week_number = (days_from_start // 7) + 1
+        if week_number < 1 or week_number > block.total_weeks:
+            raise ValueError(f"Week offset {week_offset} is outside the training block (week {week_number})")
+
+        # Get phase for this week
+        target_phase = None
+        if block.phase_map:
+            for phase_name, weeks in block.phase_map.items():
+                if week_number in weeks:
+                    target_phase = phase_name
+                    break
+        if not target_phase:
+            raise ValueError(f"No phase found for week {week_number}")
+
+        # Calculate date range for this block week (start_date based, not calendar based)
+        block_week_start = block.start_date + timedelta(days=(week_number - 1) * 7)
+        block_week_end = block_week_start + timedelta(days=6)
+
+        # Get existing workouts for this block week
+        existing_workouts = db.query(Workout).filter(
+            and_(
+                Workout.training_block_id == block_id,
+                Workout.scheduled_date >= block_week_start,
+                Workout.scheduled_date <= block_week_end
+            )
+        ).all()
+
+        # Snapshot existing workouts (max 3 per week, FIFO)
+        snapshots = copy.deepcopy(block.week_snapshots) if block.week_snapshots else {}
+        snapshot_key = f"week_{week_number}"
+
+        if existing_workouts:
+            snapshot_entry = {
+                "workouts": [w.to_dict() for w in existing_workouts],
+                "saved_at": datetime.utcnow().isoformat(),
+                "reason": reason
+            }
+            if snapshot_key not in snapshots:
+                snapshots[snapshot_key] = []
+            snapshots[snapshot_key].append(snapshot_entry)
+            # Keep only last 3 snapshots per week (FIFO)
+            if len(snapshots[snapshot_key]) > 3:
+                snapshots[snapshot_key] = snapshots[snapshot_key][-3:]
+
+        # Update block's week_snapshots
+        block.week_snapshots = snapshots
+        db.flush()
+
+        # Delete existing workouts for this week
+        for w in existing_workouts:
+            db.delete(w)
+        db.flush()
+
+        # Generate new workouts for this single week
+        phase_focus = PeriodizedWorkoutService.PHASE_FOCUS.get(target_phase, "")
+        new_workout_data = llm_service.generate_periodized_workouts(
+            event_distance=block.event_distance,
+            phase_name=target_phase,
+            phase_focus=phase_focus,
+            week_numbers=[week_number],
+            total_weeks=block.total_weeks,
+            experience_level="intermediate"
+        )
+
+        # Insert new workouts
+        for wd in new_workout_data:
+            day_num = wd.get("day")
+            scheduled_date = None
+            if block.start_date and day_num:
+                days_offset = (week_number - 1) * 7 + (day_num - 1)
+                scheduled_date = block.start_date + timedelta(days=days_offset)
+
+            workout = Workout(
+                training_block_id=block_id,
+                week=week_number,
+                day=day_num,
+                phase=target_phase,
+                type=wd.get("type", "easy_run"),
+                distance_km=wd.get("distance_km"),
+                duration_minutes=wd.get("duration_minutes"),
+                pace=wd.get("pace"),
+                notes=wd.get("notes"),
+                scheduled_date=scheduled_date,
+                is_completed=False
+            )
+            db.add(workout)
+
+        db.commit()
+
+        # Return updated week context
+        return TrainingBlockService.get_week_context(db, week_offset=week_offset)

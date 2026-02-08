@@ -32,15 +32,15 @@ export const API_ROUTES = {
   },
 
   /* ==========================================================================
-   * CHAT / PLAN GENERATION (Legacy - to be replaced by Training Block)
+   * CHAT / PLAN GENERATION (Deprecated - replaced by GoalSetup + Training Block)
    * ========================================================================== */
   CHAT: {
-    /** POST - Generate new workout plan from chat message */
+    /** POST - Generate new workout plan from chat message (Deprecated) */
     GENERATE: '/api/chat',
   },
 
   /* ==========================================================================
-   * WORKOUT PLANS (Legacy - to be replaced by Training Block)
+   * WORKOUT PLANS (Deprecated - replaced by Training Block)
    * ========================================================================== */
   WORKOUT_PLANS: {
     /** GET - List all plans with metadata */
@@ -109,7 +109,9 @@ export const API_ROUTES = {
     /** DELETE - End block early (with friction confirmation) */
     DELETE: (id) => `/api/training-block/${id}`,
     /** GET - Full plan visualization for overview screen */
-    OVERVIEW: '/api/training-block/overview',
+    OVERVIEW: (id) => `/api/training-block/${id}/overview`,
+    /** POST - Generate periodized workouts for a block */
+    GENERATE_WORKOUTS: (id) => `/api/training-block/${id}/generate-workouts`,
   },
 
   /* ==========================================================================

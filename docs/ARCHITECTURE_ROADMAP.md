@@ -1,7 +1,7 @@
 # Workout Coach Architecture Roadmap
 
 > **Last Updated:** February 2026
-> **Status:** Phase 1 Complete ✅ (20% overall)
+> **Status:** Phase 5 Complete ✅ (90% overall — MVP core loop done)
 > **Mantra:** "Plan your work, work your plan"
 
 ---
@@ -97,7 +97,7 @@ Workout
 
 ---
 
-## Target API Structure
+## API Structure (Implemented)
 
 ```
 # Goal/Block Management
@@ -148,46 +148,44 @@ GET    /api/training-block/overview     → full plan visualization
 
 ---
 
-## Target Frontend Architecture
+## Frontend Architecture (Implemented)
 
 ```
-App
+App (tabs: Week, Coach, Plans)
 │
-├── WeekView (HOME - both modes)
-│     ├── WeekHeader
-│     │     - Training: "Week 8 · Build Phase · 8 weeks to Boston"
-│     │     - Maintenance: "This Week"
+├── WeekView (Week tab - both modes) ✅
+│     ├── WeekHeader (phase/mode context)
+│     ├── WeekNav (prev/next week arrows)
 │     ├── DayCards (Mon-Sun)
 │     │     └── WorkoutCard (tap to edit/complete)
-│     ├── WeekActions
-│     │     - "Regenerate Week" (with optional context)
-│     │     - "Add Workout"
-│     └── WeekNav (prev/next week arrows)
+│     ├── WeekActions ("Regenerate Week" + "Add Workout")
+│     └── RegenerateModal (coach-style, optional reason)
 │
-├── BlockOverview (training mode only, secondary screen)
-│     ├── PhaseTimeline (visual: base → build → peak → taper)
-│     ├── WeekGrid (clickable weeks, current highlighted)
-│     └── Stats (completion rate, miles logged)
+├── BlockOverview (Plans tab) ✅
+│     ├── PhaseTimeline (colored bars: base/build/peak/taper)
+│     ├── Progress bar + completion stats
+│     └── "End Training Block" (with ConfirmModal)
 │
-├── GoalSetup (modal/flow)
-│     ├── "Start Training Block" → race picker, date, generates plan
-│     └── "Just Staying Fit" → sets maintenance mode
+├── GoalSetup (modal — Coach tab when no block) ✅
+│     ├── ModeSelect ("Train for a Race" / "Just Staying Fit")
+│     ├── RaceDetails (event, distance, date, experience)
+│     └── PhasePreview (timeline with +/- adjustment)
 │
-└── Settings
-      ├── Profile (available days, experience level)
-      └── Current goal management
+└── Coach tab behavior (state-aware) ✅
+      ├── No active block → opens GoalSetup
+      └── Active block → navigates to Week + opens RegenerateModal
 ```
 
 ---
 
-## Components Being Replaced
+## Components Replaced (Phase 5 — All Complete)
 
-| Current Component | Replacement | Reason |
-|-------------------|-------------|--------|
-| `WeekAheadView.jsx` (300+ lines) | `WeekView` + subcomponents | Too many responsibilities |
-| `PlanManager/` (entire folder) | `BlockOverview` | Simpler mental model |
-| `ChatInterface.jsx` | `GoalSetup` flow | Guided > chat-based |
-| `MonthView.jsx` | Keep (optional alternate view) | Still useful |
+| Old Component | Replacement | Status |
+|---------------|-------------|--------|
+| `WeekAheadView.jsx` (300+ lines) | `WeekView/` + subcomponents | ✅ Deleted |
+| `PlanManager/` (entire folder) | `BlockOverview/` | ✅ Deleted |
+| `ChatInterface.jsx` | `GoalSetup/` flow | ✅ Deleted |
+| `MonthView.jsx` | Removed from nav | ✅ Deleted |
 
 ---
 
@@ -204,56 +202,67 @@ App
 ### Phase 2: New Data Model
 **Goal:** Backend supports new architecture
 
-- [ ] `TrainingBlock` model + Alembic migration
-- [ ] Update `Workout` model (add `training_block_id`, `phase`, `actuals`)
-- [ ] `/api/week` endpoint (new unified weekly view)
-- [ ] `/api/training-block` CRUD endpoints
-- [ ] Migration script: `WorkoutPlan` → `TrainingBlock`
+- [X] `TrainingBlock` model + Alembic migration
+- [X] Update `Workout` model (add `training_block_id`, `phase`, `actuals`)
+- [X] `/api/week` endpoint (new unified weekly view)
+- [X] `/api/training-block` CRUD endpoints
+- [X] Migration script: `WorkoutPlan` → `TrainingBlock`
 
 ### Phase 3: New Frontend Core
 **Goal:** Replace WeekAheadView with new WeekView
 
-- [ ] `WeekHeader` component (phase/mode context)
-- [ ] `DayCard` component (single day with workouts)
-- [ ] `WorkoutCard` updates (quick actions)
-- [ ] `WeekView` assembly (compose header + days + actions)
-- [ ] Week navigation (prev/next + scroll to past)
+- [X] `WeekHeader` component (phase/mode context)
+- [X] `DayCard` component (single day with workouts)
+- [X] `WorkoutCard` updates (quick actions)
+- [X] `WeekView` assembly (compose header + days + actions)
+- [X] Week navigation (prev/next + scroll to past)
+- Note: This has not been tested yet
 
-### Phase 4: Goal Setup Flow
+### Phase 4: Goal Setup Flow ✅
 **Goal:** Replace chat-based plan generation
 
-- [ ] `GoalSetup` modal ("Start Training Block" vs "Stay Fit")
-- [ ] Race setup flow (event, date, experience → LLM generates block)
-- [ ] Phase visualization (show phases before confirming)
-- [ ] Phase adjustment UI (edit lengths with friction modal)
+- [X] `GoalSetup` modal ("Start Training Block" vs "Stay Fit")
+- [X] Race setup flow (event, date, experience → LLM generates block)
+- [X] Phase visualization (show phases before confirming)
+- [X] Phase adjustment UI (inline +/- controls with constraint validation)
+- [X] `POST /api/training-block/:id/generate-workouts` endpoint
+- [X] `PeriodizedWorkoutService` — phase-by-phase LLM generation
+- [X] `phaseCalculator.js` — default phase distribution + adjustment utility
+- Note: Not yet integration-tested against live backend
 
-### Phase 5: Polish & Multi-user
-**Goal:** Production-ready
+### Phase 5: Polish & Cleanup ✅
+**Goal:** Complete the MVP core loop
 
-- [ ] `BlockOverview` screen (visual timeline)
-- [ ] Regenerate with context ("I'm tired" → smarter output)
+- [X] `BlockOverview` screen (phase timeline, stats, end block)
+- [X] `RegenerateModal` — coach-style modal with optional reason
+- [X] `POST /api/week/regenerate` endpoint with snapshot history (max 3 per week)
+- [X] LLM prompt fix: enforce 1 workout per day
+- [X] Coach tab state-aware (no block → GoalSetup; active block → regenerate)
+- [X] Plans tab renders `BlockOverview` instead of `PlanManager`
+- [X] Month tab removed from nav
+- [X] Deprecated components deleted (ChatInterface, WeekAheadView, MonthView, PlanManager)
+- [X] `week_snapshots` JSONB column on `training_blocks` (migration: `h2i3j4k5l6m7`)
+
+### Phase 6: Multi-user (Future)
+**Goal:** Production multi-user support
+
 - [ ] Multi-user support (LOC-8: User model, auth, data isolation)
-- [ ] Remove deprecated components
+- [ ] User preferences (available days, experience level, weekly mileage)
 
 ---
 
-## What Gets Deprecated
+## What's Deprecated
 
-After migration completes:
+**Frontend components deleted** (Phase 5):
+- `WeekAheadView.jsx`, `ChatInterface.jsx`, `MonthView.jsx`, `PlanManager/` folder — all removed
 
-**Models:**
-- `WorkoutPlan` → replaced by `TrainingBlock`
-
-**Endpoints:**
+**Backend endpoints kept but deprecated** (legacy data preserved for prompt engineering):
 - `POST /api/chat` → replaced by `POST /api/training-block`
 - `GET /api/workout-plans` → replaced by `GET /api/training-block`
 - `POST /api/workout-plans/:id/activate` → no longer needed (one block per user)
 
-**Components:**
-- `WeekAheadView.jsx`
-- `ChatInterface.jsx`
-- `PlanManager/` folder
-- `PlanCard.jsx`, `PlanList.jsx`, `ActivePlanView.jsx`
+**Models kept:**
+- `WorkoutPlan` — kept alongside `TrainingBlock`; `workout_plan_id` nullable on Workout model
 
 ---
 
@@ -335,8 +344,8 @@ Return JSON array of workouts with: day, workout_type, distance, duration, notes
 
 ## Related Linear Issues
 
-- LOC-8: Create User Profiles and Beta Access System (Phase 5)
-- LOC-20: Unable to edit when workout is rest (fix during Phase 3)
-- LOC-22: Include additional workouts per day (already implemented, verify in Phase 3)
-- LOC-18: Fix workout card display (address in Phase 3)
-- LOC-17: Plan management usability (superseded by new architecture)
+- LOC-8: Create User Profiles and Beta Access System (Phase 6)
+- LOC-20: Unable to edit when workout is rest ✅ (fixed)
+- LOC-22: Include additional workouts per day ✅ (implemented)
+- LOC-18: Fix workout card display ✅ (addressed in Phase 3)
+- LOC-17: Plan management usability ✅ (superseded by BlockOverview)

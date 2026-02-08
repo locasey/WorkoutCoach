@@ -34,6 +34,7 @@ class TrainingBlock(Base):
     start_date = Column(Date, nullable=False)  # When training begins
     total_weeks = Column(Integer, nullable=False)  # Total weeks in the block
     phase_map = Column(JSONB, nullable=False)  # {"base": [1,2,3,4], "build": [5,6,7,8], ...}
+    week_snapshots = Column(JSONB, nullable=True, default={})  # Regeneration history per week
 
     # Status - uses PostgreSQL native enum
     status = Column(training_block_status_enum, default='active', nullable=False)
@@ -85,6 +86,7 @@ class TrainingBlock(Base):
             'start_date': self.start_date.isoformat() if self.start_date else None,
             'total_weeks': self.total_weeks,
             'phase_map': self.phase_map,
+            'week_snapshots': self.week_snapshots,
             'status': self.status,
             'current_week': self.get_current_week(),
             'current_phase': self.get_current_phase(),

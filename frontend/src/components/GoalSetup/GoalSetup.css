@@ -1,0 +1,465 @@
+/* ==========================================================================
+ * GoalSetup Modal - Wizard for creating training blocks
+ * Follows ConfirmModal patterns (backdrop, centered container, z-index)
+ * ========================================================================== */
+
+/* BACKDROP */
+.goal-setup__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* CONTAINER */
+.goal-setup__container {
+  background: white;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  overflow-y: auto;
+  position: relative;
+  padding: 24px;
+}
+
+/* CLOSE BUTTON */
+.goal-setup__close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-400);
+  padding: 4px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  z-index: 1;
+}
+
+.goal-setup__close-btn:hover {
+  color: var(--carbon-black);
+  background: var(--gray-100);
+}
+
+/* ==========================================================================
+ * STEP LAYOUT
+ * ========================================================================== */
+
+.goal-setup__step {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.goal-setup__step-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--carbon-black);
+  margin: 0;
+}
+
+.goal-setup__step-desc {
+  font-size: 15px;
+  color: var(--gray-600);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* BACK BUTTON */
+.goal-setup__back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--gray-600);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 4px;
+  width: fit-content;
+}
+
+.goal-setup__back-btn:hover {
+  color: var(--carbon-black);
+}
+
+/* ==========================================================================
+ * MODE SELECT (Step 1)
+ * ========================================================================== */
+
+.goal-setup__mode-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.goal-setup__mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 20px;
+  border: 2px solid var(--gray-200);
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.goal-setup__mode-card:hover {
+  border-color: var(--persian-blue);
+  background: rgba(0, 71, 255, 0.03);
+}
+
+.goal-setup__mode-card h3 {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--carbon-black);
+  margin: 0;
+}
+
+.goal-setup__mode-card p {
+  font-size: 14px;
+  color: var(--gray-600);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.goal-setup__mode-icon {
+  color: var(--persian-blue);
+}
+
+.goal-setup__mode-card--maintenance .goal-setup__mode-icon {
+  color: var(--gray-400);
+}
+
+/* ==========================================================================
+ * RACE DETAILS FORM (Step 2)
+ * ========================================================================== */
+
+.goal-setup__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.goal-setup__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.goal-setup__field label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--carbon-black);
+}
+
+.goal-setup__field input[type="text"],
+.goal-setup__field input[type="date"],
+.goal-setup__field select {
+  padding: 12px;
+  border: 2px solid var(--gray-200);
+  border-radius: 10px;
+  font-size: 15px;
+  color: var(--carbon-black);
+  background: white;
+  transition: border-color 0.15s ease;
+}
+
+.goal-setup__field input:focus,
+.goal-setup__field select:focus {
+  outline: none;
+  border-color: var(--persian-blue);
+}
+
+.goal-setup__field-hint {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.goal-setup__field-hint--error {
+  color: var(--persian-red, #c53030);
+}
+
+/* Radio group for experience level */
+.goal-setup__radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.goal-setup__radio-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  border: 2px solid var(--gray-200);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.goal-setup__radio-card:hover {
+  border-color: var(--gray-400);
+}
+
+.goal-setup__radio-card--selected {
+  border-color: var(--persian-blue);
+  background: rgba(0, 71, 255, 0.03);
+}
+
+.goal-setup__radio-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.goal-setup__radio-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--carbon-black);
+}
+
+.goal-setup__radio-desc {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+/* Next / Submit button */
+.goal-setup__next-btn {
+  padding: 14px 20px;
+  background: var(--persian-blue);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 8px;
+}
+
+.goal-setup__next-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.goal-setup__next-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+ * PHASE PREVIEW (Step 3)
+ * ========================================================================== */
+
+/* Timeline bar */
+.phase-preview__timeline {
+  display: flex;
+  height: 32px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.phase-preview__bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  transition: width 0.3s ease;
+}
+
+.phase-preview__bar-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Phase detail cards */
+.phase-preview__phases {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.phase-preview__phase {
+  padding: 12px 16px;
+  background: var(--gray-50, #f9fafb);
+  border-radius: 10px;
+}
+
+.phase-preview__phase-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.phase-preview__phase-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.phase-preview__phase-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.phase-preview__phase-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--carbon-black);
+}
+
+.phase-preview__phase-weeks {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.phase-preview__phase-focus {
+  font-size: 13px;
+  color: var(--gray-600);
+  margin: 6px 0 0 22px;
+  line-height: 1.4;
+}
+
+/* Adjust controls */
+.phase-preview__adjust-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.phase-preview__adjust-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  color: var(--gray-600);
+  transition: all 0.15s ease;
+}
+
+.phase-preview__adjust-btn:hover:not(:disabled) {
+  border-color: var(--persian-blue);
+  color: var(--persian-blue);
+}
+
+.phase-preview__adjust-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.phase-preview__adjust-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--carbon-black);
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Text link button */
+.goal-setup__text-btn {
+  background: none;
+  border: none;
+  color: var(--persian-blue);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-align: center;
+}
+
+.goal-setup__text-btn:hover {
+  text-decoration: underline;
+}
+
+/* Generate button */
+.goal-setup__generate-btn {
+  padding: 16px 20px;
+  background: var(--persian-blue);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.goal-setup__generate-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.goal-setup__generate-btn:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+/* Spinner for generating state */
+.goal-setup__generate-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: goal-setup-spin 0.8s linear infinite;
+}
+
+@keyframes goal-setup-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+ * EMPTY STATE CTA BUTTON (used in WeekView)
+ * ========================================================================== */
+
+.week-view__empty-cta {
+  padding: 14px 28px;
+  background: var(--persian-blue);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 4px;
+}
+
+.week-view__empty-cta:hover {
+  opacity: 0.9;
+}

@@ -14,6 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `frontend/src/api/queryClient.js` - React Query v5 config with sensible defaults + query key factories
   - `frontend/src/components/WeekView/` - Shell component for new unified week view (Phase 3 implementation)
   - `@tanstack/react-query@^5` added to frontend dependencies
+- **Training Block Architecture (Phase 2)**
+  - New `TrainingBlock` model: event-based training with periodization phases (base/build/peak/taper)
+  - `training_blocks` table with event_name, event_distance, target_date, phase_map (JSONB), status
+  - Updated `Workout` model: added `training_block_id` (FK), `phase`, `actuals` (JSONB for logged data)
+  - `TrainingBlockService`: manages blocks, calculates current week/phase, provides week context
+  - **New Endpoints:**
+    - `GET /api/training-block` - Get active block (null = maintenance mode)
+    - `POST /api/training-block` - Create new training block
+    - `PUT /api/training-block/:id` - Update block details
+    - `PUT /api/training-block/:id/phases` - Adjust phase structure
+    - `DELETE /api/training-block/:id` - End block (complete or abandon)
+    - `GET /api/training-block/:id/overview` - Full block visualization with stats
+    - `GET /api/week?offset=N` - Unified weekly view (works in training & maintenance modes)
+  - Alembic migration: `g1h2i3j4k5l6_add_training_blocks.py`
 - **Multiple Workouts Per Day (LOC-22)**
   - New `slot` column on workouts table: NULL=single, 1=AM, 2=PM (max 2 per day)
   - `POST /api/workouts/day` - Add workout to a day with auto slot assignment
@@ -68,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `main.jsx` now wraps App with `QueryClientProvider` for React Query support
 - `index.css` imports design tokens from `styles/tokens.css`
+- **Workout model**: `workout_plan_id` now nullable (supports new architecture alongside legacy)
 - **Strava Feature Flag (LOC-23)**: Strava integration now disabled by default via `STRAVA_ENABLED` (backend) and `VITE_STRAVA_ENABLED` (frontend) env vars. All code intact for future re-enablement.
 - **Plans tab flow**: Manage Active Plan is now the default view; "Manage All Plans" button opens the full plan list; "Back to Active Plan" returns from All Plans
 - **Plans tab**: Nav label "Settings" → "Plans"; icon Settings → ClipboardList (key remains `plans`)

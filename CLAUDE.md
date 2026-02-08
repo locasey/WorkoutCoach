@@ -272,8 +272,8 @@ The backend follows a service-oriented architecture:
 
 **Utilities**:
 - `workoutMapper.js` - Maps workout types to display icons and colors
-- `dateUtils.js` - Shared `formatDate()` for display (e.g. PlanCard, ActivePlanView)
-- `phaseCalculator.js` - `calculatePhaseMap(totalWeeks)`, `adjustPhaseMap()`, `calculateTotalWeeks()`, `PHASE_INFO` constants
+- `dateUtils.js` - `parseLocalDate(dateStr)` for safe YYYY-MM-DD → local Date parsing; `formatDate()` for display
+- `phaseCalculator.js` - `calculatePhaseMap(totalWeeks)`, `adjustPhaseMap()`, `calculateTotalWeeks(targetDate, startDate?)`, `PHASE_INFO` constants
 
 **API Communication**: Components use `axios` for HTTP requests to backend endpoints
 
@@ -298,7 +298,7 @@ The backend follows a service-oriented architecture:
 - `PUT /api/workouts/<id>/complete` - Toggle workout completion status
 - `PUT /api/workouts/<id>` - Update workout fields (partial updates supported)
 - `DELETE /api/workouts/<id>` - Delete workout (demotes remaining slot on multi-workout days)
-- `POST /api/workouts/day` - Add workout to a day (auto slot: 1=AM, 2=PM)
+- `POST /api/workouts/day` - Add workout to a day (accepts `training_block_id` or legacy `workout_plan_id`; auto slot: 1=AM, 2=PM)
 - `GET /api/workouts/day/<date>` - Get all workouts for a specific date
 
 **Training Block (New Architecture)**:
@@ -373,6 +373,20 @@ plan = WorkoutPlanService.get_workout_plan(db, plan_uuid)
 3. **Active plan logic** - Only one plan can be active at a time. Setting a plan active automatically deactivates others.
 
 4. **Cascade deletes** - Deleting a WorkoutPlan automatically deletes all associated Workout records.
+
+### Date Parsing (Frontend)
+
+**Always use `parseLocalDate()` from `dateUtils.js`** when converting YYYY-MM-DD strings to Date objects:
+```js
+import { parseLocalDate } from '../../utils/dateUtils'
+const date = parseLocalDate('2026-02-02')  // Local midnight
+```
+**Never use `new Date("YYYY-MM-DD")`** — JavaScript parses date-only strings as UTC midnight, which shifts to the previous day in US timezones. This caused week displays to be off by one day.
+
+### CORS & Auth (Production)
+
+- `CORS_ORIGINS` env var must be set to the frontend domain (e.g., `https://workoutcoach.liamocasey.com`). If blank, CORS fails because `supports_credentials=True` is incompatible with wildcard `*`.
+- `@require_auth` decorator skips OPTIONS preflight requests — without this, CORS preflight gets 401 and browsers block all cross-origin requests.
 
 ### LLM Integration
 

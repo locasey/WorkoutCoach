@@ -23,20 +23,46 @@ const EXPERIENCE_LEVELS = [
  * Form inputs: event name, distance, target date, experience level.
  * Auto-calculates total_weeks from today to target_date.
  */
+/**
+ * Returns the next Monday (ISO string) from a given date.
+ */
+function getNextMonday(from = new Date()) {
+  const d = new Date(from)
+  const day = d.getDay() // 0=Sun
+  const diff = day === 0 ? 1 : day === 1 ? 7 : 8 - day
+  d.setDate(d.getDate() + diff)
+  return d.toISOString().split('T')[0]
+}
+
+const START_OPTIONS = [
+  { value: 'today', label: 'Today', desc: 'Start training immediately' },
+  { value: 'next_monday', label: 'Next Monday', desc: 'Start at the beginning of the week' },
+  { value: 'custom', label: 'Custom Date', desc: 'Pick a specific start date' },
+]
+
 export function RaceDetails({ onNext, onBack, initialData = {} }) {
   const [eventName, setEventName] = useState(initialData.eventName || '')
   const [distance, setDistance] = useState(initialData.distance || 'half')
   const [customDistance, setCustomDistance] = useState(initialData.customDistance || '')
   const [targetDate, setTargetDate] = useState(initialData.targetDate || '')
   const [experience, setExperience] = useState(initialData.experience || 'intermediate')
+  const [startOption, setStartOption] = useState(initialData.startOption || 'today')
+  const [customStartDate, setCustomStartDate] = useState(initialData.customStartDate || '')
+
+  const resolvedStartDate = useMemo(() => {
+    if (startOption === 'today') return new Date().toISOString().split('T')[0]
+    if (startOption === 'next_monday') return getNextMonday()
+    return customStartDate || null
+  }, [startOption, customStartDate])
 
   const totalWeeks = useMemo(() => {
     if (!targetDate) return null
-    return calculateTotalWeeks(targetDate)
-  }, [targetDate])
+    if (!resolvedStartDate) return null
+    return calculateTotalWeeks(targetDate, resolvedStartDate)
+  }, [targetDate, resolvedStartDate])
 
   const effectiveDistance = distance === 'other' ? customDistance.trim() : distance
-  const isValid = eventName.trim() && effectiveDistance && targetDate && totalWeeks >= 4 && totalWeeks <= 52
+  const isValid = eventName.trim() && effectiveDistance && targetDate && resolvedStartDate && totalWeeks >= 4 && totalWeeks <= 52
 
   // Minimum date = 4 weeks from today
   const minDate = useMemo(() => {
@@ -55,7 +81,7 @@ export function RaceDetails({ onNext, onBack, initialData = {} }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!isValid) return
-    onNext({ eventName, distance: effectiveDistance, customDistance, targetDate, experience, totalWeeks })
+    onNext({ eventName, distance: effectiveDistance, customDistance, targetDate, startDate: resolvedStartDate, experience, totalWeeks, startOption, customStartDate })
   }
 
   return (
@@ -127,6 +153,38 @@ export function RaceDetails({ onNext, onBack, initialData = {} }) {
                   ? 'Race must be within 52 weeks'
                   : `${totalWeeks} weeks of training`}
             </span>
+          )}
+        </div>
+
+        <div className="goal-setup__field">
+          <label>Start Training</label>
+          <div className="goal-setup__radio-group">
+            {START_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className={`goal-setup__radio-card ${startOption === opt.value ? 'goal-setup__radio-card--selected' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="start_option"
+                  value={opt.value}
+                  checked={startOption === opt.value}
+                  onChange={(e) => setStartOption(e.target.value)}
+                  className="goal-setup__radio-input"
+                />
+                <span className="goal-setup__radio-label">{opt.label}</span>
+                <span className="goal-setup__radio-desc">{opt.desc}</span>
+              </label>
+            ))}
+          </div>
+          {startOption === 'custom' && (
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              max={targetDate || undefined}
+              required
+            />
           )}
         </div>
 

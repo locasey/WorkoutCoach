@@ -74,13 +74,27 @@
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
   background: var(--gray-100);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: inherit;
   transition: all var(--transition-fast);
+}
+
+.week-nav__current:not(:disabled):hover {
+  background: var(--gray-200);
+  border-color: var(--gray-400);
+}
+
+.week-nav__current:focus-visible {
+  outline: 2px solid var(--persian-blue);
+  outline-offset: 2px;
 }
 
 .week-nav__current--active {
   background: rgba(0, 71, 255, 0.08);
   border: 1px solid rgba(0, 71, 255, 0.2);
+  cursor: default;
 }
 
 .week-nav__current-icon {

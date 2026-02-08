@@ -112,6 +112,7 @@ export function GoalSetup({ isOpen, onClose }) {
         event_name: raceData.eventName,
         event_distance: raceData.distance,
         target_date: raceData.targetDate,
+        start_date: raceData.startDate,
         total_weeks: raceData.totalWeeks,
         phase_map: finalPhaseMap,
       })

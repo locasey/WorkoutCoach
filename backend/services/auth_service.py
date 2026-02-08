@@ -220,6 +220,10 @@ def require_auth(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Let CORS preflight requests through (OPTIONS)
+        if request.method == 'OPTIONS':
+            return f(*args, **kwargs)
+
         # Skip auth if not enabled (development without credentials)
         if not is_auth_enabled():
             return f(*args, **kwargs)

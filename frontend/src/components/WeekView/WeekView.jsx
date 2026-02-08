@@ -33,6 +33,7 @@ import { useToast } from '../Toast'
 import { queryKeys } from '../../api/queryClient'
 import { API_ROUTES, buildUrl } from '../../api/routes'
 import { mapWorkoutToDesign } from '../../utils/workoutMapper'
+import { parseLocalDate } from '../../utils/dateUtils'
 
 import './WeekView.css'
 
@@ -56,7 +57,7 @@ const generateWeekDates = (weekStart) => {
     })
   }
 
-  const start = new Date(weekStart)
+  const start = parseLocalDate(weekStart)
   return Array.from({ length: 7 }, (_, i) => {
     const date = new Date(start)
     date.setDate(start.getDate() + i)
@@ -167,7 +168,7 @@ export function WeekView({
   const addWorkoutMutation = useMutation({
     mutationFn: async ({ scheduledDate, type = 'easy_run' }) => {
       const response = await axios.post(API_ROUTES.WORKOUTS.ADD_TO_DAY, {
-        workout_plan_id: weekData?.block_id,
+        training_block_id: weekData?.block_id,
         scheduled_date: scheduledDate,
         type,
         duration_minutes: 30,
@@ -373,7 +374,7 @@ export function WeekView({
         <>
           <nav className="week-view__day-picker" aria-label="Day selector">
             {weekDates.map((date, idx) => {
-              const d = new Date(date)
+              const d = parseLocalDate(date)
               const dayName = d.toLocaleDateString('en-US', { weekday: 'short' })
               const dayNum = d.getDate()
               const todayStr = new Date().toISOString().split('T')[0]

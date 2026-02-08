@@ -9,6 +9,7 @@
 
 import React from 'react'
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
+import { parseLocalDate } from '../../utils/dateUtils'
 import './WeekNav.css'
 
 /**
@@ -38,8 +39,8 @@ export function WeekNav({
   const formatWeekRange = () => {
     if (!weekStart || !weekEnd) return null
 
-    const start = new Date(weekStart)
-    const end = new Date(weekEnd)
+    const start = parseLocalDate(weekStart)
+    const end = parseLocalDate(weekEnd)
 
     const startMonth = start.toLocaleDateString('en-US', { month: 'short' })
     const endMonth = end.toLocaleDateString('en-US', { month: 'short' })
@@ -78,14 +79,20 @@ export function WeekNav({
         <span className="week-nav__button-text">Previous</span>
       </button>
 
-      {/* Current Week Indicator */}
-      <div className={`week-nav__current ${isCurrentWeek ? 'week-nav__current--active' : ''}`}>
+      {/* Current Week Indicator — clickable when not on current week */}
+      <button
+        className={`week-nav__current ${isCurrentWeek ? 'week-nav__current--active' : ''}`}
+        onClick={() => !isCurrentWeek && onWeekChange?.(0)}
+        disabled={isCurrentWeek}
+        title={isCurrentWeek ? undefined : 'Return to current week'}
+        aria-label={isCurrentWeek ? getWeekLabel() : 'Return to current week'}
+      >
         <Calendar className="week-nav__current-icon" aria-hidden="true" />
         <div className="week-nav__current-info">
           <span className="week-nav__current-label">{getWeekLabel()}</span>
           {weekRange && <span className="week-nav__current-range">{weekRange}</span>}
         </div>
-      </div>
+      </button>
 
       {/* Next Week Button */}
       <button

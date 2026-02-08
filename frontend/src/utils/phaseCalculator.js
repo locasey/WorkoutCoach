@@ -133,16 +133,17 @@ export const PHASE_INFO = {
 }
 
 /**
- * Calculate total weeks from today to a target date.
+ * Calculate total weeks from a start date to a target date.
  * @param {string} targetDate - ISO date string (YYYY-MM-DD)
+ * @param {string} [startDate] - ISO date string (YYYY-MM-DD), defaults to today
  * @returns {number} Number of full weeks
  */
-export function calculateTotalWeeks(targetDate) {
+export function calculateTotalWeeks(targetDate, startDate) {
   const target = new Date(targetDate)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const start = startDate ? new Date(startDate) : new Date()
+  start.setHours(0, 0, 0, 0)
   target.setHours(0, 0, 0, 0)
-  const diffMs = target.getTime() - today.getTime()
+  const diffMs = target.getTime() - start.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
   return Math.floor(diffDays / 7)
 }

@@ -153,7 +153,7 @@ function App() {
           <div className="header-content">
             <div>
               <h1>Workout Coach</h1>
-              <p>Your AI-powered training companion</p>
+              <p>Plan your work(out), work your plan</p>
             </div>
             <button
               onClick={handleLogout}

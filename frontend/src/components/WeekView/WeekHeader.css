@@ -32,6 +32,11 @@
   font-weight: var(--font-semibold);
 }
 
+.week-header__phase[data-phase="base"]  { color: #5a8a6a; }
+.week-header__phase[data-phase="build"] { color: var(--persian-blue); }
+.week-header__phase[data-phase="peak"]  { color: var(--rust-brown); }
+.week-header__phase[data-phase="taper"] { color: var(--success-green); }
+
 /* Countdown */
 .week-header__countdown {
   font-size: var(--text-sm);

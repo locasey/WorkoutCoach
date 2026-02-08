@@ -11,6 +11,7 @@ import React from 'react'
 import { Plus, Calendar } from 'lucide-react'
 import { WorkoutCard } from '../WorkoutCard'
 import { mapWorkoutToDesign } from '../../utils/workoutMapper'
+import { parseLocalDate } from '../../utils/dateUtils'
 import './DayCard.css'
 
 /**
@@ -21,7 +22,7 @@ import './DayCard.css'
 const formatDayDisplay = (dateStr) => {
   if (!dateStr) return { dayName: '', dayNumber: '' }
 
-  const date = new Date(dateStr)
+  const date = parseLocalDate(dateStr)
   const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
   const dayNumber = date.getDate()
 
@@ -37,8 +38,7 @@ const isToday = (dateStr) => {
   if (!dateStr) return false
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const date = new Date(dateStr)
-  date.setHours(0, 0, 0, 0)
+  const date = parseLocalDate(dateStr)
   return today.getTime() === date.getTime()
 }
 

@@ -1,4 +1,5 @@
 import React from 'react'
+import { parseLocalDate } from '../../utils/dateUtils'
 import './WeekHeader.css'
 
 const capitalize = (str) => {
@@ -21,8 +22,8 @@ export function WeekHeader({
   const formatDateRange = () => {
     if (!weekStart || !weekEnd) return null
 
-    const start = new Date(weekStart)
-    const end = new Date(weekEnd)
+    const start = parseLocalDate(weekStart)
+    const end = parseLocalDate(weekEnd)
 
     const startStr = start.toLocaleDateString('en-US', {
       month: 'short',
@@ -47,7 +48,7 @@ export function WeekHeader({
           <>
             <h1 className="week-header__title">
               Week {weekNumber}{totalWeeks && ` / ${totalWeeks}`}
-              {phase && <span className="week-header__phase"> &middot; {capitalize(phase)} Phase</span>}
+              {phase && <span className="week-header__phase" data-phase={phase}> &middot; {capitalize(phase)} Phase</span>}
             </h1>
 
             {weeksUntilRace !== undefined && eventName && (

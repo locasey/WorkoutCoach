@@ -11,15 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CoachMenu` component — bottom-sheet (mobile) / modal (desktop) with 3 options: Regenerate Week, Start New Block, Adjust Phases
 - Mobile day-picker in `WeekView` — horizontal scrollable day pills + single DayCard hero below 768px
 - `.week-view__empty-cta` CSS for maintenance mode CTA button
+- `POST /api/training-block/<id>/generate-workouts` endpoint — LLM generates periodized workouts phase-by-phase
+- `POST /api/week/regenerate` endpoint wired in `app.py` — snapshots old workouts, LLM generates new ones
+- Start date selection in GoalSetup: Today (default), Next Monday, or Custom Date; `start_date` passed to backend on block creation
+- Phase-colored `WeekHeader`: base=green, build=blue, peak=rust, taper=green via `data-phase` attribute
 
 ### Changed
 - `WeekHeader` simplified — single-line "Week 8/16 . Build Phase", removed phase focus badge and lucide icons, reduced padding
 - `WeekHeader` maintenance mode — "This Week" + date inline, "Just Staying Fit" subtitle
 - Coach tab now opens `CoachMenu` (3 options) instead of directly triggering RegenerateModal
 - Maintenance empty state messaging — "Maintenance Mode" with friendlier copy
+- `WeekNav` current week indicator is now a clickable button — returns to current week when navigated away
+- App header tagline: "Plan your work(out), work your plan"
+- `calculateTotalWeeks()` now accepts optional `startDate` parameter (defaults to today for backward compat)
 
 ### Fixed
+- **Critical**: `app.py` restored — file was emptied during Phase 5 commit due to disk space; recovered from `7bcbc3d` + added Phase 5 endpoints
 - **Critical**: `get_week_context()` leaked ALL workouts by date range — now filters by `training_block_id` (training mode) or orphan workouts only (maintenance mode)
+- **Critical**: CORS preflight blocked in production — `@require_auth` returned 401 on OPTIONS requests; now skips auth for preflight
+- "Add Workout" broken with training blocks — `POST /api/workouts/day` now accepts `training_block_id` (new arch) alongside legacy `workout_plan_id`; frontend sends correct field; added missing `Workout` model import
+- Week dates off by one day in US timezones — `new Date("YYYY-MM-DD")` parsed as UTC midnight; added `parseLocalDate()` helper, applied across WeekView, WeekNav, WeekHeader, DayCard, dateUtils
 
 ### Added (prior)
 - **Architecture Roadmap Phase 5: Polish & Cleanup**

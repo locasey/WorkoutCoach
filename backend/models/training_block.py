@@ -1,19 +1,16 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, Text, Enum
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text
+from sqlalchemy.dialects.postgresql import UUID, JSONB, ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-import enum
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import Base
 
 
-class TrainingBlockStatus(enum.Enum):
-    ACTIVE = "active"
-    COMPLETED = "completed"
-    ABANDONED = "abandoned"
+# Use PostgreSQL native enum (already created in migration)
+training_block_status_enum = ENUM('active', 'completed', 'abandoned', name='training_block_status', create_type=False)
 
 
 class TrainingBlock(Base):
@@ -38,12 +35,8 @@ class TrainingBlock(Base):
     total_weeks = Column(Integer, nullable=False)  # Total weeks in the block
     phase_map = Column(JSONB, nullable=False)  # {"base": [1,2,3,4], "build": [5,6,7,8], ...}
 
-    # Status
-    status = Column(
-        Enum(TrainingBlockStatus, name='training_block_status'),
-        default=TrainingBlockStatus.ACTIVE,
-        nullable=False
-    )
+    # Status - uses PostgreSQL native enum
+    status = Column(training_block_status_enum, default='active', nullable=False)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -92,7 +85,7 @@ class TrainingBlock(Base):
             'start_date': self.start_date.isoformat() if self.start_date else None,
             'total_weeks': self.total_weeks,
             'phase_map': self.phase_map,
-            'status': self.status.value if self.status else None,
+            'status': self.status,
             'current_week': self.get_current_week(),
             'current_phase': self.get_current_phase(),
             'weeks_until_race': self.get_weeks_until_race(),

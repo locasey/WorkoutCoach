@@ -1,7 +1,7 @@
 """Add training_blocks table and update workouts for new architecture
 
 Revision ID: g1h2i3j4k5l6
-Revises: f7g8h9i0j1k2
+Revises: d5f9g3h7i8j9
 Create Date: 2026-02-08
 
 This migration introduces the TrainingBlock model for the new architecture:
@@ -17,31 +17,30 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 # revision identifiers, used by Alembic.
 revision = 'g1h2i3j4k5l6'
-down_revision = 'f7g8h9i0j1k2'
+down_revision = 'd5f9g3h7i8j9'
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    # Create training_block_status enum
-    training_block_status = sa.Enum('active', 'completed', 'abandoned', name='training_block_status')
-    training_block_status.create(op.get_bind(), checkfirst=True)
+    # Create enum and table using raw SQL to avoid SQLAlchemy enum issues
+    op.execute("""
+        CREATE TYPE training_block_status AS ENUM ('active', 'completed', 'abandoned');
 
-    # Create training_blocks table
-    op.create_table(
-        'training_blocks',
-        sa.Column('id', UUID(as_uuid=True), primary_key=True),
-        sa.Column('user_id', sa.Integer(), nullable=True),
-        sa.Column('event_name', sa.String(255), nullable=False),
-        sa.Column('event_distance', sa.String(50), nullable=False),
-        sa.Column('target_date', sa.Date(), nullable=False),
-        sa.Column('start_date', sa.Date(), nullable=False),
-        sa.Column('total_weeks', sa.Integer(), nullable=False),
-        sa.Column('phase_map', JSONB(), nullable=False),
-        sa.Column('status', training_block_status, nullable=False, server_default='active'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(timezone=True), onupdate=sa.func.now()),
-    )
+        CREATE TABLE training_blocks (
+            id UUID PRIMARY KEY,
+            user_id INTEGER,
+            event_name VARCHAR(255) NOT NULL,
+            event_distance VARCHAR(50) NOT NULL,
+            target_date DATE NOT NULL,
+            start_date DATE NOT NULL,
+            total_weeks INTEGER NOT NULL,
+            phase_map JSONB NOT NULL,
+            status training_block_status NOT NULL DEFAULT 'active',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE
+        );
+    """)
 
     # Add training_block_id to workouts (nullable FK)
     op.add_column('workouts', sa.Column('training_block_id', UUID(as_uuid=True), nullable=True))

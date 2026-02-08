@@ -6,7 +6,7 @@ import uuid
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from models.training_block import TrainingBlock, TrainingBlockStatus
+from models.training_block import TrainingBlock
 from models.workout import Workout
 
 
@@ -25,7 +25,7 @@ class TrainingBlockService:
     def get_active_block(db: Session, user_id: int = None) -> Optional[TrainingBlock]:
         """Get the user's active training block (or None if in maintenance mode)."""
         query = db.query(TrainingBlock).filter(
-            TrainingBlock.status == TrainingBlockStatus.ACTIVE
+            TrainingBlock.status == 'active'  # Use string value for PostgreSQL enum
         )
         if user_id is not None:
             query = query.filter(TrainingBlock.user_id == user_id)
@@ -66,7 +66,7 @@ class TrainingBlockService:
         # Deactivate any existing active block for this user
         existing = TrainingBlockService.get_active_block(db, user_id)
         if existing:
-            existing.status = TrainingBlockStatus.ABANDONED
+            existing.status = 'abandoned'
 
         # Calculate start_date if not provided
         if start_date is None:
@@ -80,7 +80,7 @@ class TrainingBlockService:
             start_date=start_date,
             total_weeks=total_weeks,
             phase_map=phase_map,
-            status=TrainingBlockStatus.ACTIVE
+            status='active'
         )
 
         db.add(block)
@@ -135,7 +135,7 @@ class TrainingBlockService:
         if not block:
             return None
 
-        block.status = TrainingBlockStatus.COMPLETED if completed else TrainingBlockStatus.ABANDONED
+        block.status = 'completed' if completed else 'abandoned'
         db.commit()
         db.refresh(block)
         return block

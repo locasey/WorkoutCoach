@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Race Day card in `DayCard` — dedicated card type when day matches `target_date` (gold gradient, flag emoji, suppresses Add button)
+- `WORKOUT_TYPES` centralized in `workoutMapper.js` — single source of truth for type values and display labels; `WorkoutEditModal` imports from here instead of defining its own list
+- `formatWorkoutType()` exported from `workoutMapper.js` — used by WorkoutCard, mobile day picker, and edit modal
+
+### Changed
+- `DayCard` no longer duplicates day name or "Today" badge inside embedded WorkoutCards — DayCard header is the single source for day context
+- AM/PM slot indicator redesigned as a clean pill badge (`.card-slot`) instead of inline text appended to day name
+- `WorkoutCard` header conditionally renders — only shows when there's content (day, slot, phase, today badge)
+- Mobile day picker shows formatted workout types ("Easy Run") instead of raw identifiers ("easy_run"); race day pill shows flag emoji
+
+### Fixed
+- **Critical**: Workout duration not rendering on cards — `DayCard.mapWorkout()` incorrectly detected raw API data as pre-mapped (checked `!workout_type` which raw data also lacks); now checks for `_original` property from `mapWorkoutToDesign()`
+- **Critical**: Workout titles showing raw identifiers (`easy_run`) instead of formatted names (`Easy Run`) — same root cause as duration bug
+- Confetti firing on every render when workout was already completed — now uses `useRef` to only trigger on status transition to completed
+- `getDayName()` in `workoutMapper.js` used `new Date()` on YYYY-MM-DD strings (UTC midnight bug) — now uses `parseLocalDate()`
+
+### Added (prior)
 - `CoachMenu` component — bottom-sheet (mobile) / modal (desktop) with 3 options: Regenerate Week, Start New Block, Adjust Phases
 - Mobile day-picker in `WeekView` — horizontal scrollable day pills + single DayCard hero below 768px
 - `.week-view__empty-cta` CSS for maintenance mode CTA button

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Check, Minus, Edit2, Clock, Gauge, Heart, StickyNote, ChevronDown, ChevronUp, Calendar, Zap } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import './WorkoutCard.css';
@@ -17,13 +17,13 @@ import './WorkoutCard.css';
  */
 export function WorkoutCard({ workout, onToggle, onEdit, isToday = false, isAM = false, isPM = false, phase, actuals }) {
   const [justCompleted, setJustCompleted] = useState(false);
+  const prevStatusRef = useRef(workout.status);
 
-  // Track when workout status changes to completed
+  // Fire confetti only when status transitions TO completed (not on mount)
   useEffect(() => {
-    if (workout.status === 'completed') {
+    if (workout.status === 'completed' && prevStatusRef.current !== 'completed') {
       setJustCompleted(true);
-      
-      // Trigger confetti celebration
+
       confetti({
         particleCount: 50,
         spread: 60,
@@ -31,10 +31,11 @@ export function WorkoutCard({ workout, onToggle, onEdit, isToday = false, isAM =
         colors: ['#8eb19d', '#072ac8', '#eacdc2']
       });
 
-      // Reset animation state after it completes
       const timer = setTimeout(() => setJustCompleted(false), 400);
+      prevStatusRef.current = workout.status;
       return () => clearTimeout(timer);
     }
+    prevStatusRef.current = workout.status;
   }, [workout.status]);
 
   const isEmpty = !workout.type || workout.id?.startsWith('placeholder-');
@@ -46,29 +47,26 @@ export function WorkoutCard({ workout, onToggle, onEdit, isToday = false, isAM =
 
   return (
     <div className={`workout-card ${isToday ? 'today' : ''} ${workout.status === 'completed' ? 'completed' : ''} ${workout.status === 'rest' ? 'rest' : ''} ${isEmpty ? 'empty' : ''}`}>
-      <div className="card-header">
-        <span className="card-day">
-          {workout.day}
-          {/* LOC-22: Show AM/PM indicator for multi-workout days */}
+      {/* Card header - only renders when there's content to show */}
+      {(workout.day || isAM || isPM || isToday || phase || workout.phase) && (
+        <div className="card-header">
+          {workout.day && <span className="card-day">{workout.day}</span>}
           {(isAM || isPM) && (
-            <span className="ml-1 text-[10px] font-normal text-gray-500">
-              {isAM ? 'AM' : 'PM'}
+            <span className="card-slot">{isAM ? 'AM' : 'PM'}</span>
+          )}
+          {isToday && (
+            <div className="card-today-badge">
+              <Calendar className="w-3 h-3" />
+              Today
+            </div>
+          )}
+          {(phase || workout.phase) && (
+            <span className="phase-badge" data-phase={phase || workout.phase}>
+              {(phase || workout.phase).charAt(0).toUpperCase() + (phase || workout.phase).slice(1)}
             </span>
           )}
-        </span>
-        {isToday && (
-          <div className="flex items-center gap-1 text-[10px] font-bold text-persian-blue uppercase">
-            <Calendar className="w-3 h-3" />
-            Today
-          </div>
-        )}
-        {/* Phase badge for training mode - Phase 3 */}
-        {(phase || workout.phase) && (
-          <span className="phase-badge" data-phase={phase || workout.phase}>
-            {(phase || workout.phase).charAt(0).toUpperCase() + (phase || workout.phase).slice(1)}
-          </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {!isEmpty ? (
         <>

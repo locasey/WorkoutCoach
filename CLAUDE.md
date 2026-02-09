@@ -271,7 +271,7 @@ The backend follows a service-oriented architecture:
 - **Deleted**: `ChatInterface.jsx`, `WeekAheadView.jsx`, `MonthView.jsx`, `PlanManager/` (replaced by GoalSetup, WeekView, BlockOverview).
 
 **Utilities**:
-- `workoutMapper.js` - Maps workout types to display icons and colors
+- `workoutMapper.js` - Maps API workout data to display format. Exports `WORKOUT_TYPES` (single source of truth for type values/labels), `formatWorkoutType()`, `mapWorkoutToDesign()`, distance/duration formatters
 - `dateUtils.js` - `parseLocalDate(dateStr)` for safe YYYY-MM-DD → local Date parsing; `formatDate()` for display
 - `phaseCalculator.js` - `calculatePhaseMap(totalWeeks)`, `adjustPhaseMap()`, `calculateTotalWeeks(targetDate, startDate?)`, `PHASE_INFO` constants
 

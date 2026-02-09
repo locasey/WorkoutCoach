@@ -38,6 +38,27 @@
   color: var(--gray-400);
 }
 
+.card-slot {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--persian-blue);
+  background: rgba(0, 71, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.card-today-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--persian-blue);
+}
+
 .card-status {
   display: flex;
   align-items: center;

@@ -2,6 +2,26 @@
  * Maps database workout data to the design interface format
  */
 
+import { parseLocalDate } from './dateUtils'
+
+/**
+ * Centralized workout type definitions.
+ * Single source of truth for type values and display labels.
+ * Used by WorkoutCard, WorkoutEditModal, and mobile day picker.
+ */
+export const WORKOUT_TYPES = [
+  { value: 'long_run', label: 'Long Run' },
+  { value: 'tempo', label: 'Tempo' },
+  { value: 'intervals', label: 'Intervals' },
+  { value: 'easy_run', label: 'Easy Run' },
+  { value: 'rest', label: 'Rest' },
+  { value: 'cross_training', label: 'Cross Training' },
+  { value: 'recovery', label: 'Recovery' },
+  { value: 'fartlek', label: 'Fartlek' },
+  { value: 'hill_repeats', label: 'Hill Repeats' },
+  { value: 'race', label: 'Race' },
+]
+
 /**
  * Derive workout status from database fields
  * @param {Object} workout - Workout from database
@@ -100,8 +120,8 @@ export function deriveHeartRateZone(workoutType) {
  */
 export function getDayName(scheduledDate) {
   if (!scheduledDate) return '';
-  
-  const date = new Date(scheduledDate);
+
+  const date = parseLocalDate(scheduledDate);
   // JavaScript getDay() returns 0-6 (0=Sunday, 1=Monday, ...)
   const dayIndex = date.getDay();
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -155,14 +175,18 @@ export function mapWorkoutToDesign(dbWorkout) {
 }
 
 /**
- * Format workout type for display
- * @param {string} type - Database workout type
- * @returns {string} Formatted type (e.g., "Easy Run", "Tempo Run")
+ * Format workout type for display.
+ * Uses centralized WORKOUT_TYPES for known types, falls back to snake_case → Title Case.
+ * @param {string} type - Database workout type (e.g., "easy_run")
+ * @returns {string} Formatted type (e.g., "Easy Run")
  */
-function formatWorkoutType(type) {
+export function formatWorkoutType(type) {
   if (!type) return '';
-  
-  // Convert snake_case to Title Case
+
+  const known = WORKOUT_TYPES.find(t => t.value === type);
+  if (known) return known.label;
+
+  // Fallback: snake_case to Title Case
   return type
     .split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))

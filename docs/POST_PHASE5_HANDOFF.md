@@ -1,5 +1,7 @@
 # Post-Phase-5 Handoff: Bug Fixes & UX Improvements
 
+claude --resume e98d861e-f7ea-4c80-bcf1-7d34c10d43b8
+
 ## What Was Completed
 
 ### Phase A: Workout Query Filtering (Critical Bug) - DONE

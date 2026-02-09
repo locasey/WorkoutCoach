@@ -60,29 +60,27 @@ export function DayCard({
   onToggleComplete,
   onAddWorkout,
   canAddWorkout = true,
+  targetDate,
 }) {
   const { dayName, dayNumber } = formatDayDisplay(date)
   const isTodayDate = isToday(date)
+  const isRaceDay = targetDate && date === targetDate
   const hasWorkouts = workouts.length > 0
   const hasMultiple = workouts.length > 1
-  const showAddButton = canAddWorkout && workouts.length < 2
+  const showAddButton = !isRaceDay && canAddWorkout && workouts.length < 2
 
   /**
-   * Map API workout format to design format if needed
-   * Handles both pre-mapped and raw API data
+   * Map API workout format to design format if needed.
+   * Detects already-mapped data by the _original property added by mapWorkoutToDesign.
    */
   const mapWorkout = (workout) => {
-    // If already mapped (has 'type' as display string), return as-is
-    if (workout.type && !workout.workout_type) {
-      return workout
-    }
-    // Otherwise, map from API format
+    if (workout._original) return workout
     return mapWorkoutToDesign(workout)
   }
 
   return (
     <div
-      className={`day-card ${isTodayDate ? 'day-card--today' : ''} ${!hasWorkouts ? 'day-card--empty' : ''}`}
+      className={`day-card ${isTodayDate ? 'day-card--today' : ''} ${isRaceDay ? 'day-card--race' : ''} ${!hasWorkouts && !isRaceDay ? 'day-card--empty' : ''}`}
     >
       {/* Day Header */}
       <div className="day-card__header">
@@ -100,7 +98,14 @@ export function DayCard({
 
       {/* Workouts Container */}
       <div className="day-card__workouts">
-        {hasWorkouts ? (
+        {isRaceDay ? (
+          /* Race Day */
+          <div className="day-card__race-day">
+            <span className="day-card__race-day-icon">🏁</span>
+            <span className="day-card__race-day-title">Race Day</span>
+            <span className="day-card__race-day-subtitle">You've got this!</span>
+          </div>
+        ) : hasWorkouts ? (
           <>
             {workouts.map((workout, index) => {
               const mappedWorkout = mapWorkout(workout)
@@ -112,10 +117,10 @@ export function DayCard({
                   key={workout.id}
                   workout={{
                     ...mappedWorkout,
-                    day: dayName,
+                    day: '',  // DayCard header shows day — don't duplicate
                     scheduledDate: date,
                   }}
-                  isToday={isTodayDate}
+                  isToday={false}  // DayCard header shows today badge
                   isAM={isAM}
                   isPM={isPM}
                   onToggle={() => onToggleComplete?.(workout.id)}

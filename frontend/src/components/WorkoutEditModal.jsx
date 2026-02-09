@@ -2,22 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { X, Save, AlertCircle, Check, Trash2 } from 'lucide-react';
 import { useToast } from './Toast';
+import { WORKOUT_TYPES } from '../utils/workoutMapper';
 import './WorkoutEditModal.css';
 
 const API_BASE_URL = '/api';
-
-// Valid workout types matching backend validation
-const WORKOUT_TYPES = [
-  { value: 'long_run', label: 'Long Run' },
-  { value: 'tempo', label: 'Tempo' },
-  { value: 'intervals', label: 'Intervals' },
-  { value: 'easy_run', label: 'Easy Run' },
-  { value: 'rest', label: 'Rest' },
-  { value: 'cross_training', label: 'Cross Training' },
-  { value: 'recovery', label: 'Recovery' },
-  { value: 'fartlek', label: 'Fartlek' },
-  { value: 'hill_repeats', label: 'Hill Repeats' }
-];
 
 export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
   const [formData, setFormData] = useState({

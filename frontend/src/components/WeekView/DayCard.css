@@ -96,6 +96,43 @@
 }
 
 /* ==========================================================================
+ * RACE DAY
+ * ========================================================================== */
+
+.day-card--race {
+  border: 2px solid #f59e0b;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.day-card__race-day {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.day-card__race-day-icon {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.day-card__race-day-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--carbon-black);
+}
+
+.day-card__race-day-subtitle {
+  font-size: var(--text-sm);
+  color: #92400e;
+  font-weight: var(--font-medium);
+}
+
+/* ==========================================================================
  * EMPTY STATE
  * ========================================================================== */
 

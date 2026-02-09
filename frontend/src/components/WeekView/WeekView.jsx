@@ -32,7 +32,7 @@ import { useToast } from '../Toast'
 
 import { queryKeys } from '../../api/queryClient'
 import { API_ROUTES, buildUrl } from '../../api/routes'
-import { mapWorkoutToDesign } from '../../utils/workoutMapper'
+import { mapWorkoutToDesign, formatWorkoutType } from '../../utils/workoutMapper'
 import { parseLocalDate } from '../../utils/dateUtils'
 
 import './WeekView.css'
@@ -380,13 +380,16 @@ export function WeekView({
               const todayStr = new Date().toISOString().split('T')[0]
               const isToday = date === todayStr
               const dayWorkouts = workoutsByDate[date] || []
-              const metric = dayWorkouts.length > 0
-                ? dayWorkouts[0].distance_km
-                  ? `${dayWorkouts[0].distance_km}km`
-                  : dayWorkouts[0].duration_minutes
-                    ? `${dayWorkouts[0].duration_minutes}m`
-                    : dayWorkouts[0].type || 'Rest'
-                : 'Rest'
+              const isRaceDayPill = weekData?.target_date && date === weekData.target_date
+              const metric = isRaceDayPill
+                ? '🏁'
+                : dayWorkouts.length > 0
+                  ? dayWorkouts[0].distance_km
+                    ? `${dayWorkouts[0].distance_km}km`
+                    : dayWorkouts[0].duration_minutes
+                      ? `${dayWorkouts[0].duration_minutes}m`
+                      : formatWorkoutType(dayWorkouts[0].type) || 'Rest'
+                  : 'Rest'
 
               return (
                 <button
@@ -413,6 +416,7 @@ export function WeekView({
                 onToggleComplete={handleToggleComplete}
                 onAddWorkout={handleAddWorkoutToDay}
                 canAddWorkout={weekData?.block_id != null}
+                targetDate={weekData?.target_date}
               />
             </section>
           )}
@@ -429,6 +433,7 @@ export function WeekView({
               onToggleComplete={handleToggleComplete}
               onAddWorkout={handleAddWorkoutToDay}
               canAddWorkout={weekData?.block_id != null}
+              targetDate={weekData?.target_date}
             />
           ))}
         </section>

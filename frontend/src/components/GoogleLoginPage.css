@@ -1,22 +1,88 @@
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--gray-100);
+  padding: var(--space-4);
+}
+
+.login-container {
+  background: var(--pure-white);
+  border: 2px solid var(--carbon-black);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12) var(--space-8);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.login-header {
+  margin-bottom: var(--space-8);
+}
+
+.login-header h1 {
+  font-size: var(--text-4xl);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+  color: var(--carbon-black);
+  margin-bottom: var(--space-1);
+}
+
+.login-header p {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--gray-600);
+  letter-spacing: 0.02em;
+}
+
+.login-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: #FFF5F5;
+  border: 1px solid var(--error-red);
+  border-radius: var(--radius-sm);
+  color: var(--error-red);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-4);
+}
+
+.login-divider {
+  height: 2px;
+  background: var(--gray-200);
+  margin: 0 auto var(--space-6);
+  width: 48px;
+}
+
+.login-cta {
+  font-size: var(--text-sm);
+  color: var(--gray-600);
+  margin-bottom: var(--space-4);
+}
+
 .google-login-wrapper {
   display: flex;
   justify-content: center;
-  margin: 24px 0;
+  margin: var(--space-6) 0;
 }
 
 .login-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 14px 24px;
   color: var(--gray-600);
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 
 .login-footer {
   text-align: center;
   color: var(--gray-400);
-  font-size: 0.8rem;
-  margin-top: 16px;
+  font-size: var(--text-xs);
+  margin-top: var(--space-4);
 }

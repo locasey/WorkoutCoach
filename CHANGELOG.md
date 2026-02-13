@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Login page**: Full-page centered card layout with proper styling; added divider + "Sign in to get started" CTA above Google button
+- **Deploy workflow**: Added `GOOGLE_CLIENT_ID` to frontend build env and backend container env
+
 ### Fixed
 - **Auth bypass**: `App.jsx` destructured `auth_enabled` from `/api/auth/check` but backend never returns it — `undefined` caused all users to skip login. Now uses `authenticated` directly.
 - **User creation race condition**: `create_user()` committed before invite code validation, leaving orphan rows on failure. Now uses `db.flush()` + `db.rollback()` for atomic commit.

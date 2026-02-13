@@ -90,6 +90,8 @@ function GoogleLoginPage({ onLogin }) {
           </div>
         )}
 
+        <div className="login-divider" />
+        <p className="login-cta">Sign in to get started</p>
         <div className="google-login-wrapper">
           {loading ? (
             <div className="login-loading">

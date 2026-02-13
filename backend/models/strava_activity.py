@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, Date, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Float, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -13,7 +13,7 @@ class StravaActivity(Base):
     __tablename__ = 'strava_activities'
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(Integer, nullable=True)  # Nullable for MVP (single user)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     strava_id = Column(String(50), nullable=False, unique=True)  # Strava's activity ID
     name = Column(String(255), nullable=False)
     activity_type = Column(String(50), nullable=False)  # Run, Ride, Swim, etc.

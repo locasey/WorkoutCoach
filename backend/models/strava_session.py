@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 import uuid
@@ -13,7 +13,7 @@ class StravaSession(Base):
     __tablename__ = 'strava_sessions'
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(Integer, nullable=True)  # Nullable for MVP (single user)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     session_token = Column(String(64), nullable=False, unique=True, index=True)  # Our session ID
     access_token = Column(Text, nullable=False)  # Encrypted in production
     refresh_token = Column(Text, nullable=True)  # For token refresh

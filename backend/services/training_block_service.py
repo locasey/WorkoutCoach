@@ -24,19 +24,21 @@ class TrainingBlockService:
     }
 
     @staticmethod
-    def get_active_block(db: Session, user_id: int = None) -> Optional[TrainingBlock]:
+    def get_active_block(db: Session, user_id: uuid.UUID) -> Optional[TrainingBlock]:
         """Get the user's active training block (or None if in maintenance mode)."""
         query = db.query(TrainingBlock).filter(
-            TrainingBlock.status == 'active'  # Use string value for PostgreSQL enum
+            TrainingBlock.status == 'active',  # Use string value for PostgreSQL enum
+            TrainingBlock.user_id == user_id
         )
-        if user_id is not None:
-            query = query.filter(TrainingBlock.user_id == user_id)
         return query.first()
 
     @staticmethod
-    def get_block_by_id(db: Session, block_id: uuid.UUID) -> Optional[TrainingBlock]:
-        """Get a training block by ID."""
-        return db.query(TrainingBlock).filter(TrainingBlock.id == block_id).first()
+    def get_block_by_id(db: Session, block_id: uuid.UUID, user_id: uuid.UUID = None) -> Optional[TrainingBlock]:
+        """Get a training block by ID, optionally filtered by user_id."""
+        query = db.query(TrainingBlock).filter(TrainingBlock.id == block_id)
+        if user_id is not None:
+            query = query.filter(TrainingBlock.user_id == user_id)
+        return query.first()
 
     @staticmethod
     def create_training_block(
@@ -47,7 +49,7 @@ class TrainingBlockService:
         total_weeks: int,
         phase_map: Dict[str, List[int]],
         start_date: date = None,
-        user_id: int = None
+        user_id: uuid.UUID = None
     ) -> TrainingBlock:
         """
         Create a new training block.
@@ -143,7 +145,7 @@ class TrainingBlockService:
         return block
 
     @staticmethod
-    def get_week_context(db: Session, week_offset: int = 0, user_id: int = None) -> Dict[str, Any]:
+    def get_week_context(db: Session, week_offset: int = 0, user_id: uuid.UUID = None) -> Dict[str, Any]:
         """
         Get the weekly view context for the frontend.
 
@@ -183,6 +185,7 @@ class TrainingBlockService:
                 and_(
                     Workout.training_block_id.is_(None),
                     Workout.workout_plan_id.is_(None),
+                    Workout.user_id == user_id,
                     Workout.scheduled_date >= week_start,
                     Workout.scheduled_date <= week_end
                 )
@@ -305,7 +308,8 @@ class TrainingBlockService:
         block_id: uuid.UUID,
         week_offset: int,
         reason: str,
-        llm_service
+        llm_service,
+        user_id: uuid.UUID
     ) -> Dict[str, Any]:
         """
         Regenerate workouts for a specific week of a training block.
@@ -330,6 +334,8 @@ class TrainingBlockService:
 
         block = db.query(TrainingBlock).filter(TrainingBlock.id == block_id).first()
         if not block:
+            raise ValueError(f"Training block {block_id} not found")
+        if user_id is not None and block.user_id != user_id:
             raise ValueError(f"Training block {block_id} not found")
         if block.status != 'active':
             raise ValueError(f"Training block is not active (status: {block.status})")
@@ -429,11 +435,12 @@ class TrainingBlockService:
                 pace=wd.get("pace"),
                 notes=wd.get("notes"),
                 scheduled_date=scheduled_date,
-                is_completed=False
+                is_completed=False,
+                user_id=user_id
             )
             db.add(workout)
 
         db.commit()
 
         # Return updated week context
-        return TrainingBlockService.get_week_context(db, week_offset=week_offset)
+        return TrainingBlockService.get_week_context(db, week_offset=week_offset, user_id=user_id)

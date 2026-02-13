@@ -1,7 +1,7 @@
 # Workout Coach Architecture Roadmap
 
 > **Last Updated:** February 2026
-> **Status:** Phase 5 Complete ✅ (90% overall — MVP core loop done)
+> **Status:** Phase 6 Complete (multi-user auth, data isolation, preferences, profile page, E2E tests)
 > **Mantra:** "Plan your work, work your plan"
 
 ---
@@ -131,6 +131,10 @@ POST   /api/workouts/:id/complete       → mark done + log actuals
 POST   /api/workouts                    → add ad-hoc workout
 DELETE /api/workouts/:id                → remove from week
 
+# User Profile & Preferences
+GET    /api/user/profile               → current user's profile + preferences
+PUT    /api/user/preferences           → update preferences (available_days, experience_level, weekly_mileage_comfort)
+
 # Training Block Overview (training mode only)
 GET    /api/training-block/overview     → full plan visualization
 {
@@ -151,7 +155,7 @@ GET    /api/training-block/overview     → full plan visualization
 ## Frontend Architecture (Implemented)
 
 ```
-App (tabs: Week, Coach, Plans)
+App (tabs: Week, Coach, Plans, Profile)
 │
 ├── WeekView (Week tab - both modes) ✅
 │     ├── WeekHeader (phase/mode context)
@@ -170,6 +174,11 @@ App (tabs: Week, Coach, Plans)
 │     ├── ModeSelect ("Train for a Race" / "Just Staying Fit")
 │     ├── RaceDetails (event, distance, date, experience)
 │     └── PhasePreview (timeline with +/- adjustment)
+│
+├── ProfilePage (Profile tab) ✅
+│     ├── Account info (name, email — read-only from Google)
+│     ├── Training preferences (days, experience, mileage)
+│     └── Sign Out button
 │
 └── Coach tab behavior (state-aware) ✅
       ├── No active block → opens GoalSetup
@@ -243,11 +252,29 @@ App (tabs: Week, Coach, Plans)
 - [X] Deprecated components deleted (ChatInterface, WeekAheadView, MonthView, PlanManager)
 - [X] `week_snapshots` JSONB column on `training_blocks` (migration: `h2i3j4k5l6m7`)
 
-### Phase 6: Multi-user (Future)
+### Phase 6: Multi-user ✅
 **Goal:** Production multi-user support
 
-- [ ] Multi-user support (LOC-8: User model, auth, data isolation)
-- [ ] User preferences (available days, experience level, weekly mileage)
+- [X] `User` model with roles (super_admin, admin, beta_tester) + UUID PK
+- [X] Google OAuth authentication (`AuthService` with `google.oauth2.id_token` validation)
+- [X] Session management (PostgreSQL-backed, 24hr expiry, auto-cleanup)
+- [X] `@require_auth` / `@require_admin` decorators gating all endpoints
+- [X] Invite code system (single-use, expiry, race-condition safe with row-level locking)
+- [X] `InviteCode` model + `InviteCodeService` + admin endpoints
+- [X] Database migration: `users` + `invite_codes` tables, `user_id` FK on all data tables
+- [X] Seed super_admin with `PENDING_GOOGLE_LINK` for first-login account linking
+- [X] All service methods updated to filter by `user_id` (data isolation)
+- [X] `GoogleLoginPage` component (Google widget + invite code flow)
+- [X] `InviteCodeModal` component (code entry + consent checkbox)
+- [X] `App.jsx` wired: `GoogleOAuthProvider` + `GoogleLoginPage` + auth check + logout
+- [X] Old `LoginPage` deleted (replaced by `GoogleLoginPage`)
+- [X] Admin CLI scripts (`generate_invite_code.py`, `list_invite_codes.py`)
+- [X] Cross-user data leakage fixed: 7 service methods + 10 endpoints enforce `user_id` filtering
+- [X] `GET /api/user/profile` + `PUT /api/user/preferences` endpoints
+- [X] `UserService.update_preferences()` — validates `available_days`, `experience_level`, `weekly_mileage_comfort`
+- [X] `ProfilePage.jsx` + CSS — account info, training preferences, sign-out
+- [X] Profile tab in desktop nav + mobile bottom nav (logout moved from header)
+- [X] E2E test script (`backend/scripts/test_phase6.py`) — data isolation, preferences, session lifecycle
 
 ---
 
@@ -255,6 +282,9 @@ App (tabs: Week, Coach, Plans)
 
 **Frontend components deleted** (Phase 5):
 - `WeekAheadView.jsx`, `ChatInterface.jsx`, `MonthView.jsx`, `PlanManager/` folder — all removed
+
+**Frontend components deleted** (Phase 6):
+- `LoginPage.jsx`, `LoginPage.css` — replaced by `GoogleLoginPage` with Google OAuth
 
 **Backend endpoints kept but deprecated** (legacy data preserved for prompt engineering):
 - `POST /api/chat` → replaced by `POST /api/training-block`

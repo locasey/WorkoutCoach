@@ -1,0 +1,22 @@
+.google-login-wrapper {
+  display: flex;
+  justify-content: center;
+  margin: 24px 0;
+}
+
+.login-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  color: var(--gray-600);
+  font-size: 1rem;
+}
+
+.login-footer {
+  text-align: center;
+  color: var(--gray-400);
+  font-size: 0.8rem;
+  margin-top: 16px;
+}

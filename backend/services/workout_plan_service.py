@@ -70,7 +70,7 @@ class WorkoutPlanService:
         return month_start, month_end
     
     @staticmethod
-    def create_workout_plan(db: Session, plan_data: dict, user_id: int = None) -> WorkoutPlan:
+    def create_workout_plan(db: Session, plan_data: dict, user_id: uuid.UUID) -> WorkoutPlan:
         """
         Create a new workout plan from LLM-generated plan data.
 
@@ -117,7 +117,7 @@ class WorkoutPlanService:
         workouts_data = plan_data.get('workouts', [])
         for workout_data in workouts_data:
             workout = WorkoutPlanService._create_workout(
-                db, workout_plan.id, workout_data, start_date
+                db, workout_plan.id, workout_data, start_date, user_id
             )
             db.add(workout)
         
@@ -127,7 +127,7 @@ class WorkoutPlanService:
         return workout_plan
     
     @staticmethod
-    def _create_workout(db: Session, plan_id: uuid.UUID, workout_data: dict, plan_start_date: date) -> Workout:
+    def _create_workout(db: Session, plan_id: uuid.UUID, workout_data: dict, plan_start_date: date, user_id: uuid.UUID) -> Workout:
         """Create a workout from workout data"""
         week = workout_data.get('week', 1)
         day = workout_data.get('day', 1)
@@ -145,50 +145,54 @@ class WorkoutPlanService:
             pace=workout_data.get('pace'),
             notes=workout_data.get('notes'),
             scheduled_date=scheduled_date,
-            is_completed=False
+            is_completed=False,
+            user_id=user_id
         )
-        
+
         return workout
     
     @staticmethod
-    def get_workout_plan(db: Session, plan_id: uuid.UUID) -> WorkoutPlan:
-        """Get a workout plan by ID"""
-        return db.query(WorkoutPlan).filter(WorkoutPlan.id == plan_id).first()
-    
-    @staticmethod
-    def get_all_workout_plans(db: Session, user_id: int = None) -> list[WorkoutPlan]:
-        """Get all workout plans, optionally filtered by user_id"""
-        query = db.query(WorkoutPlan)
-        if user_id is not None:
-            query = query.filter(WorkoutPlan.user_id == user_id)
-        return query.order_by(WorkoutPlan.created_at.desc()).all()
-    
-    @staticmethod
-    def get_active_workout_plan(db: Session, user_id: int = None) -> WorkoutPlan:
-        """Get the currently active workout plan"""
-        query = db.query(WorkoutPlan).filter(WorkoutPlan.is_active == True)
+    def get_workout_plan(db: Session, plan_id: uuid.UUID, user_id: uuid.UUID = None) -> WorkoutPlan:
+        """Get a workout plan by ID, optionally filtered by user_id."""
+        query = db.query(WorkoutPlan).filter(WorkoutPlan.id == plan_id)
         if user_id is not None:
             query = query.filter(WorkoutPlan.user_id == user_id)
         return query.first()
     
     @staticmethod
-    def set_active_workout_plan(db: Session, plan_id: uuid.UUID, user_id: int = None) -> WorkoutPlan:
+    def get_all_workout_plans(db: Session, user_id: uuid.UUID) -> list[WorkoutPlan]:
+        """Get all workout plans for a specific user"""
+        query = db.query(WorkoutPlan).filter(WorkoutPlan.user_id == user_id)
+        return query.order_by(WorkoutPlan.created_at.desc()).all()
+    
+    @staticmethod
+    def get_active_workout_plan(db: Session, user_id: uuid.UUID) -> WorkoutPlan:
+        """Get the currently active workout plan for a specific user"""
+        query = db.query(WorkoutPlan).filter(
+            WorkoutPlan.is_active == True,
+            WorkoutPlan.user_id == user_id
+        )
+        return query.first()
+    
+    @staticmethod
+    def set_active_workout_plan(db: Session, plan_id: uuid.UUID, user_id: uuid.UUID) -> WorkoutPlan:
         """
-        Set a workout plan as active. Deactivates all other plans.
-        
+        Set a workout plan as active. Deactivates all other plans for this user.
+
         Args:
             db: Database session
             plan_id: ID of plan to activate
-            user_id: Optional user ID filter
-        
+            user_id: User ID
+
         Returns:
             Activated WorkoutPlan object
         """
-        # Deactivate all other plans
-        query = db.query(WorkoutPlan).filter(WorkoutPlan.is_active == True)
-        if user_id is not None:
-            query = query.filter(WorkoutPlan.user_id == user_id)
-        
+        # Deactivate all other plans for this user
+        query = db.query(WorkoutPlan).filter(
+            WorkoutPlan.is_active == True,
+            WorkoutPlan.user_id == user_id
+        )
+
         for plan in query.all():
             plan.is_active = False
         
@@ -204,16 +208,16 @@ class WorkoutPlanService:
         return plan
     
     @staticmethod
-    def get_workouts_for_week(db: Session, week_start: date, week_end: date, user_id: int = None) -> list[Workout]:
+    def get_workouts_for_week(db: Session, week_start: date, week_end: date, user_id: uuid.UUID) -> list[Workout]:
         """
-        Get workouts for a specific week (date range).
-        
+        Get workouts for a specific week (date range) for a specific user.
+
         Args:
             db: Database session
             week_start: Start date of the week (Monday)
             week_end: End date of the week (Sunday)
-            user_id: Optional user ID filter
-            
+            user_id: User ID
+
         Returns:
             List of Workout objects
         """
@@ -221,48 +225,44 @@ class WorkoutPlanService:
             and_(
                 Workout.scheduled_date >= week_start,
                 Workout.scheduled_date <= week_end,
-                WorkoutPlan.is_active == True
+                WorkoutPlan.is_active == True,
+                WorkoutPlan.user_id == user_id
             )
         )
-        
-        if user_id is not None:
-            query = query.filter(WorkoutPlan.user_id == user_id)
 
         # Order by date, then slot (NULL first = single workout, then AM=1, PM=2)
         return query.order_by(Workout.scheduled_date, Workout.slot.nullsfirst()).all()
 
     @staticmethod
-    def get_workouts_for_month(db: Session, year: int, month: int, user_id: int = None) -> list[Workout]:
+    def get_workouts_for_month(db: Session, year: int, month: int, user_id: uuid.UUID) -> list[Workout]:
         """
-        Get workouts for a specific calendar month.
-        
+        Get workouts for a specific calendar month for a specific user.
+
         Args:
             db: Database session
             year: Year (e.g., 2024)
             month: Month (1-12)
-            user_id: Optional user ID filter
-            
+            user_id: User ID
+
         Returns:
             List of Workout objects
         """
         month_start, month_end = WorkoutPlanService.get_month_start_end(year, month)
-        
+
         query = db.query(Workout).join(WorkoutPlan).filter(
             and_(
                 Workout.scheduled_date >= month_start,
                 Workout.scheduled_date <= month_end,
-                WorkoutPlan.is_active == True
+                WorkoutPlan.is_active == True,
+                WorkoutPlan.user_id == user_id
             )
         )
-        
-        if user_id is not None:
-            query = query.filter(WorkoutPlan.user_id == user_id)
 
         # Order by date, then slot (NULL first = single workout, then AM=1, PM=2)
         return query.order_by(Workout.scheduled_date, Workout.slot.nullsfirst()).all()
 
     @staticmethod
-    def get_week_progress(db: Session, week_start: date, week_end: date, user_id: int = None) -> dict:
+    def get_week_progress(db: Session, week_start: date, week_end: date, user_id: uuid.UUID) -> dict:
         """
         Get progress summary for a specific week.
         
@@ -301,14 +301,20 @@ class WorkoutPlanService:
         }
     
     @staticmethod
-    def get_workout(db: Session, workout_id: uuid.UUID) -> Workout:
-        """Get a workout by ID"""
-        return db.query(Workout).filter(Workout.id == workout_id).first()
+    def get_workout(db: Session, workout_id: uuid.UUID, user_id: uuid.UUID = None) -> Workout:
+        """Get a workout by ID, optionally filtered by user_id."""
+        query = db.query(Workout).filter(Workout.id == workout_id)
+        if user_id is not None:
+            query = query.filter(Workout.user_id == user_id)
+        return query.first()
     
     @staticmethod
-    def toggle_workout_completion(db: Session, workout_id: uuid.UUID) -> Workout:
+    def toggle_workout_completion(db: Session, workout_id: uuid.UUID, user_id: uuid.UUID = None) -> Workout:
         """Toggle workout completion status"""
-        workout = db.query(Workout).filter(Workout.id == workout_id).first()
+        query = db.query(Workout).filter(Workout.id == workout_id)
+        if user_id is not None:
+            query = query.filter(Workout.user_id == user_id)
+        workout = query.first()
         if not workout:
             raise ValueError(f"Workout with id {workout_id} not found")
         
@@ -390,22 +396,26 @@ class WorkoutPlanService:
         return errors
     
     @staticmethod
-    def update_workout(db: Session, workout_id: uuid.UUID, update_data: dict) -> Workout:
+    def update_workout(db: Session, workout_id: uuid.UUID, update_data: dict, user_id: uuid.UUID = None) -> Workout:
         """
         Update workout details. Only updates fields provided in update_data.
-        
+
         Args:
             db: Database session
             workout_id: ID of workout to update
             update_data: Dictionary with fields to update (partial updates supported)
-            
+            user_id: User ID for ownership check
+
         Returns:
             Updated Workout object
-            
+
         Raises:
             ValueError: If workout not found or validation fails
         """
-        workout = db.query(Workout).filter(Workout.id == workout_id).first()
+        query = db.query(Workout).filter(Workout.id == workout_id)
+        if user_id is not None:
+            query = query.filter(Workout.user_id == user_id)
+        workout = query.first()
         if not workout:
             raise ValueError(f"Workout with id {workout_id} not found")
         
@@ -513,7 +523,7 @@ class WorkoutPlanService:
         workout_plan_id: uuid.UUID,
         scheduled_date: date,
         workout_data: dict,
-        user_id: int = None
+        user_id: uuid.UUID
     ) -> Workout:
         """
         Add a workout to a day that may already have one workout.
@@ -544,7 +554,7 @@ class WorkoutPlanService:
         if not plan:
             raise ValueError(f"Workout plan with id {workout_plan_id} not found")
 
-        if user_id is not None and plan.user_id != user_id:
+        if plan.user_id != user_id:
             raise ValueError(f"Workout plan with id {workout_plan_id} not found")
 
         # Get existing workouts for this day
@@ -591,7 +601,8 @@ class WorkoutPlanService:
             pace=workout_data.get('pace'),
             notes=workout_data.get('notes'),
             scheduled_date=scheduled_date,
-            is_completed=False
+            is_completed=False,
+            user_id=user_id
         )
 
         db.add(new_workout)
@@ -601,7 +612,7 @@ class WorkoutPlanService:
         return new_workout
 
     @staticmethod
-    def delete_workout(db: Session, workout_id: uuid.UUID, user_id: int = None) -> bool:
+    def delete_workout(db: Session, workout_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """
         Delete a workout. If this leaves only one workout on the day,
         demote that workout's slot back to NULL.
@@ -617,15 +628,12 @@ class WorkoutPlanService:
         Raises:
             ValueError: If workout not found
         """
-        workout = db.query(Workout).filter(Workout.id == workout_id).first()
+        query = db.query(Workout).filter(Workout.id == workout_id)
+        if user_id is not None:
+            query = query.filter(Workout.user_id == user_id)
+        workout = query.first()
         if not workout:
             raise ValueError(f"Workout with id {workout_id} not found")
-
-        # Check user_id if provided (via workout plan)
-        if user_id is not None:
-            plan = db.query(WorkoutPlan).filter(WorkoutPlan.id == workout.workout_plan_id).first()
-            if plan and plan.user_id != user_id:
-                raise ValueError(f"Workout with id {workout_id} not found")
 
         # Store date and plan_id before deletion
         scheduled_date = workout.scheduled_date
@@ -649,28 +657,29 @@ class WorkoutPlanService:
         return True
 
     @staticmethod
-    def check_plan_limit(db: Session, max_plans: int = 5) -> dict:
+    def check_plan_limit(db: Session, max_plans: int, user_id: uuid.UUID) -> dict:
         """
-        Check if the plan limit has been reached.
-        
+        Check if the plan limit has been reached for a specific user.
+
         Args:
             db: Database session
             max_plans: Maximum number of plans allowed
-            
+            user_id: User ID
+
         Returns:
             Dictionary with limit status and existing plans if at limit
         """
-        current_count = db.query(WorkoutPlan).count()
-        
+        current_count = db.query(WorkoutPlan).filter(WorkoutPlan.user_id == user_id).count()
+
         if current_count >= max_plans:
-            existing_plans = WorkoutPlanService.get_all_workout_plans(db)
+            existing_plans = WorkoutPlanService.get_all_workout_plans(db, user_id)
             return {
                 "at_limit": True,
                 "current_count": current_count,
                 "max_allowed": max_plans,
                 "existing_plans": [plan.to_dict() for plan in existing_plans]
             }
-        
+
         return {
             "at_limit": False,
             "current_count": current_count,
@@ -705,7 +714,7 @@ class WorkoutPlanService:
         return f"Plan - {created_at.strftime('%b %Y')}"
 
     @staticmethod
-    def update_workout_plan_name(db: Session, plan_id: uuid.UUID, name: str, user_id: int = None) -> WorkoutPlan:
+    def update_workout_plan_name(db: Session, plan_id: uuid.UUID, name: str, user_id: uuid.UUID) -> WorkoutPlan:
         """
         Update the name of a workout plan.
 
@@ -733,8 +742,8 @@ class WorkoutPlanService:
         if len(name) > 255:
             raise ValueError("Plan name cannot exceed 255 characters")
 
-        # Check user_id if provided
-        if user_id is not None and plan.user_id != user_id:
+        # Check user_id
+        if plan.user_id != user_id:
             raise ValueError(f"Workout plan with id {plan_id} not found")
 
         plan.name = name.strip()
@@ -744,7 +753,7 @@ class WorkoutPlanService:
         return plan
 
     @staticmethod
-    def delete_workout_plan(db: Session, plan_id: uuid.UUID, user_id: int = None) -> bool:
+    def delete_workout_plan(db: Session, plan_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """
         Delete a workout plan. Cannot delete active plan.
 
@@ -764,8 +773,8 @@ class WorkoutPlanService:
         if not plan:
             return False
 
-        # Check user_id if provided
-        if user_id is not None and plan.user_id != user_id:
+        # Check user_id
+        if plan.user_id != user_id:
             return False
 
         # Cannot delete active plan

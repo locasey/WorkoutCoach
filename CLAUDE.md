@@ -206,14 +206,31 @@ npm run build  # Production build
 npm run preview  # Preview production build
 ```
 
+### Invite Codes (Beta Access)
+
+New users need an invite code to sign up. Requires the migration to be applied and an admin user in the DB.
+
+```bash
+cd backend
+
+# Generate a new invite code (single-use, expires in 7 days)
+python scripts/generate_invite_code.py
+
+# List all invite codes with status (ACTIVE / USED / EXPIRED)
+python scripts/list_invite_codes.py
+```
+
+**Note:** `generate_invite_code.py` looks up the admin user by email (`locasey615@gmail.com`). The admin must exist in the `users` table first (created by the Phase 6 migration).
+
 ### Testing
 
 Backend testing scripts are in `backend/scripts/`:
 - `test_phase2.py` - Test workout plan CRUD operations
 - `test_phase3.py` - Test week/month view endpoints
 - `test_phase4.py` - Test workout editing endpoints
+- `test_phase6.py` - Test multi-user data isolation, preferences CRUD, session lifecycle
 
-Run with: `python scripts/test_phase2.py`
+Run with: `python scripts/test_phase6.py` (requires running backend server)
 
 ## Architecture Overview
 
@@ -240,9 +257,12 @@ The backend follows a service-oriented architecture:
 
 **Services** (`backend/services/`):
 - `llm_service.py` - Abstracts LLM providers (Gemini/OpenAI), generates structured workout plans from chat messages + `generate_periodized_workouts()` for phase-specific generation
-- `workout_plan_service.py` - Business logic for workout CRUD, plan activation, week/month queries, progress tracking
-- `training_block_service.py` - TrainingBlock CRUD, week context calculation, block overview with phase status, `regenerate_week()` (snapshot + delete + LLM regen for a single week)
+- `workout_plan_service.py` - Business logic for workout CRUD, plan activation, week/month queries, progress tracking. Key methods accept `user_id` for data isolation.
+- `training_block_service.py` - TrainingBlock CRUD, week context calculation, block overview with phase status, `regenerate_week()` (snapshot + delete + LLM regen for a single week). `get_block_by_id()` accepts `user_id`.
 - `periodized_workout_service.py` - Orchestrates phase-by-phase LLM workout generation for training blocks
+- `user_service.py` - User CRUD, Google OAuth lookup/creation, `update_preferences()` with validation
+- `auth_service.py` - Google token validation, session management, `@require_auth` / `@require_admin` decorators
+- `invite_code_service.py` - Invite code generation, validation, and single-use redemption
 - `excel_service.py` - Generates formatted Excel exports using openpyxl
 - `strava_service.py` - OAuth flow and activity fetching from Strava API
 
@@ -254,10 +274,11 @@ The backend follows a service-oriented architecture:
 ### Frontend Architecture (React)
 
 **Entry Point**: `frontend/src/App.jsx`
-- Tab-based navigation: Week, Coach, Plans (+ Strava if enabled)
+- Tab-based navigation: Week, Coach, Plans, Profile (+ Strava if enabled)
 - Coach tab is state-aware: no block → GoalSetup; active block → Week + RegenerateModal
 - Queries active training block via React Query for state detection
 - Month tab removed; Plans tab renders BlockOverview
+- Profile tab renders ProfilePage (preferences + logout)
 
 **Components** (`frontend/src/components/`):
 - `WeekView/` - Unified weekly training view with React Query. Subcomponents: WeekHeader (phase/mode context), DayCard (single day with workouts), WeekNav (prev/next navigation), WeekActions (Regenerate/Add buttons).
@@ -268,7 +289,10 @@ The backend follows a service-oriented architecture:
 - `StravaImport.jsx` - Strava OAuth and activity data display (disabled by default).
 - `WorkoutCard.jsx` - High-contrast "sporty" component for workout details, showing Planned vs. Actual metrics.
 - `WorkoutEditModal.jsx` - Mobile-optimized bottom-sheet for editing workout details.
-- **Deleted**: `ChatInterface.jsx`, `WeekAheadView.jsx`, `MonthView.jsx`, `PlanManager/` (replaced by GoalSetup, WeekView, BlockOverview).
+- `ProfilePage.jsx` - Profile tab: read-only account info (name/email from Google), editable training preferences (available days, experience level, weekly mileage), sign-out button.
+- `GoogleLoginPage.jsx` - Google OAuth login with invite code flow for new users.
+- `InviteCodeModal.jsx` - Invite code entry + consent checkbox for new user signup.
+- **Deleted**: `ChatInterface.jsx`, `WeekAheadView.jsx`, `MonthView.jsx`, `PlanManager/`, `LoginPage.jsx` (replaced by GoalSetup, WeekView, BlockOverview, GoogleLoginPage).
 
 **Utilities**:
 - `workoutMapper.js` - Maps API workout data to display format. Exports `WORKOUT_TYPES` (single source of truth for type values/labels), `formatWorkoutType()`, `mapWorkoutToDesign()`, distance/duration formatters
@@ -278,6 +302,10 @@ The backend follows a service-oriented architecture:
 **API Communication**: Components use `axios` for HTTP requests to backend endpoints
 
 ### Key API Endpoints
+
+**User Profile & Preferences**:
+- `GET /api/user/profile` - Returns authenticated user's profile + preferences
+- `PUT /api/user/preferences` - Update preferences: `available_days` (list of mon-sun), `experience_level` (beginner/intermediate/advanced), `weekly_mileage_comfort` (number)
 
 **Workout Plans**:
 - `POST /api/chat` - Generate new workout plan from chat message
@@ -345,8 +373,18 @@ FLASK_ENV=development
 FLASK_DEBUG=True
 SECRET_KEY=your_secret_key_here
 
+# Google OAuth (required for authentication)
+GOOGLE_CLIENT_ID=your_google_client_id_here
+
 # Workout Plans Limit
 MAX_WORKOUT_PLANS=5  # Optional, defaults to 5
+```
+
+Frontend `.env` (or `frontend/.env`):
+```env
+VITE_API_URL=http://localhost:5000   # Backend URL
+VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
+VITE_STRAVA_ENABLED=false            # Set to 'true' to enable Strava tab
 ```
 
 ## Important Implementation Details
@@ -367,7 +405,7 @@ finally:
 2. **Models use UUID primary keys** - Always convert string IDs to UUID when querying:
 ```python
 plan_uuid = uuid.UUID(plan_id)
-plan = WorkoutPlanService.get_workout_plan(db, plan_uuid)
+plan = WorkoutPlanService.get_workout_plan(db, plan_uuid, user_id=user_id)
 ```
 
 3. **Active plan logic** - Only one plan can be active at a time. Setting a plan active automatically deactivates others.
@@ -445,10 +483,10 @@ The `LLMService` abstracts provider differences:
 - **Regenerate:** `POST /api/week/regenerate` with snapshot history ✅ (Phase 5)
 - **Plans tab:** `PlanManager/` → `BlockOverview` with phase timeline ✅ (Phase 5)
 - **Deprecated components deleted:** ChatInterface, WeekAheadView, MonthView, PlanManager ✅ (Phase 5)
-- **Remaining:** Multi-user support (Phase 6)
+- **Multi-user:** Google OAuth + invite codes + data isolation + user preferences ✅ (Phase 6)
 
 ### Current State
-- **Single user MVP**: `user_id` is nullable and set to `None` throughout. Multi-user support is Phase 6.
+- **Multi-user**: Google OAuth login, invite-code gated signup. All data filtered by `user_id` via `@require_auth` + service-layer enforcement.
 - **Strava disabled**: Feature flag disabled via `STRAVA_ENABLED` env vars. Code preserved, not deleted.
 - **Week calculations**: Week starts on Monday (ISO 8601). Unified view via `TrainingBlockService.get_week_context()`.
 - **Frontend state**: React Query for server state; component state for UI.
@@ -456,9 +494,20 @@ The `LLMService` abstracts provider differences:
 
 ## Database Schema
 
+**users**:
+- `id` (UUID, PK)
+- `email` (String(255), unique, indexed)
+- `name` (String(255), nullable)
+- `google_id` (String(255), unique, indexed) - Google OAuth sub ID
+- `role` (Enum: super_admin/admin/beta_tester)
+- `preferences` (JSONB, nullable) - `{ available_days, experience_level, weekly_mileage_comfort }`
+- `settings` (JSONB, nullable)
+- `invite_code_used` (String(50), nullable)
+- `created_at`, `updated_at` (DateTime)
+
 **training_blocks**:
 - `id` (UUID, PK)
-- `user_id` (Integer, nullable)
+- `user_id` (UUID, FK → users)
 - `event_name` (String(255)) - e.g., "Boston Marathon"
 - `event_distance` (String(50)) - "marathon", "half", "10k", "5k", or custom
 - `target_date` (Date) - Race day

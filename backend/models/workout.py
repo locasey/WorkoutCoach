@@ -30,6 +30,9 @@ class Workout(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+    # User ownership (denormalized for direct queries)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+
     # Actuals - logged data after workout completion
     actuals = Column(JSONB, nullable=True)  # {"distance": 6.5, "duration": 52, "notes": "Felt great"}
 

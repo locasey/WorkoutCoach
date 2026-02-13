@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 import uuid
@@ -13,7 +13,7 @@ class AuthSession(Base):
     __tablename__ = 'auth_sessions'
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(Integer, nullable=True)  # Nullable for MVP (single user)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     session_token = Column(String(64), nullable=False, unique=True, index=True)  # Session token for auth
     expires_at = Column(DateTime(timezone=True), nullable=False, index=True)  # When session expires
     created_at = Column(DateTime(timezone=True), server_default=func.now())

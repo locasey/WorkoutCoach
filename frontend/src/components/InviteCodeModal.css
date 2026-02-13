@@ -1,0 +1,163 @@
+.invite-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.invite-modal {
+  width: 100%;
+  max-width: 420px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  padding: 32px;
+}
+
+.invite-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.invite-header svg {
+  color: var(--persian-blue);
+  margin: 0 auto 12px;
+}
+
+.invite-header h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--carbon-black);
+  margin-bottom: 4px;
+}
+
+.invite-header p {
+  color: var(--gray-600);
+  font-size: 0.9rem;
+}
+
+.invite-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.invite-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(213, 0, 0, 0.08);
+  border: 1px solid var(--error-red);
+  border-radius: 8px;
+  color: var(--error-red);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.invite-input-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 6px;
+}
+
+.invite-input-group input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-align: center;
+  border: 2px solid var(--gray-200);
+  border-radius: 8px;
+  background: white;
+  color: var(--carbon-black);
+  transition: border-color 0.15s;
+}
+
+.invite-input-group input:focus {
+  outline: none;
+  border-color: var(--persian-blue);
+  box-shadow: 0 0 0 3px rgba(0, 71, 255, 0.1);
+}
+
+.invite-input-group input:disabled {
+  background: var(--gray-100);
+  cursor: not-allowed;
+}
+
+.invite-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.invite-consent input[type="checkbox"] {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--persian-blue);
+}
+
+.invite-consent span {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  line-height: 1.4;
+}
+
+.invite-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.invite-cancel {
+  flex: 1;
+  padding: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gray-600);
+  background: var(--gray-100);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.invite-cancel:hover:not(:disabled) {
+  background: var(--gray-200);
+}
+
+.invite-submit {
+  flex: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: white;
+  background: var(--persian-blue);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.invite-submit:hover:not(:disabled) {
+  background: #0035cc;
+}
+
+.invite-submit:disabled {
+  background: var(--gray-400);
+  cursor: not-allowed;
+}

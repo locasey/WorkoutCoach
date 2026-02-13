@@ -32,6 +32,14 @@ export const API_ROUTES = {
   },
 
   /* ==========================================================================
+   * USER PROFILE & PREFERENCES
+   * ========================================================================== */
+  USER: {
+    PROFILE: '/api/user/profile',
+    PREFERENCES: '/api/user/preferences',
+  },
+
+  /* ==========================================================================
    * CHAT / PLAN GENERATION (Deprecated - replaced by GoalSetup + Training Block)
    * ========================================================================== */
   CHAT: {

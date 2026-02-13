@@ -35,7 +35,8 @@ class PeriodizedWorkoutService:
         db: Session,
         block_id: uuid.UUID,
         experience_level: str = "intermediate",
-        llm_service: LLMService = None
+        llm_service: LLMService = None,
+        user_id: uuid.UUID = None
     ) -> Dict[str, Any]:
         """
         Generate all workouts for a training block, phase by phase.
@@ -120,7 +121,8 @@ class PeriodizedWorkoutService:
                     pace=workout_data.get("pace"),
                     notes=workout_data.get("notes"),
                     scheduled_date=scheduled_date,
-                    is_completed=False
+                    is_completed=False,
+                    user_id=user_id
                 )
                 db.add(workout)
                 all_workouts.append(workout)

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, Text
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -23,7 +23,7 @@ class TrainingBlock(Base):
     __tablename__ = 'training_blocks'
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(Integer, nullable=True)  # Nullable for MVP (single user)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
 
     # Event details
     event_name = Column(String(255), nullable=False)  # e.g., "Boston Marathon"

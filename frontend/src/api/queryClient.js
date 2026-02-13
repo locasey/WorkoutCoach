@@ -154,6 +154,13 @@ export const queryKeys = {
     /** Auth status check */
     status: ['auth', 'status'],
   },
+
+  /**
+   * User profile and preferences
+   */
+  user: {
+    profile: ['user', 'profile'],
+  },
 }
 
 /**

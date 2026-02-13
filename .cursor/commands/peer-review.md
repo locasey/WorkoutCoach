@@ -4,9 +4,6 @@ A different team lead within the company has reviewed the current code/implement
 - **You are the team lead** - don't accept findings at face value
 - Your job is to critically evaluate each finding
 
-Findings from peer review:
-
-[PASTE FINDINGS FROM THE OTHER MODEL]
 
 ---
 
@@ -20,3 +17,7 @@ After analysis, provide:
 - Summary of valid findings (confirmed issues)
 - Summary of invalid findings (with explanations)
 - Prioritized action plan for confirmed issues
+
+Findings from peer review:
+
+(Request the user share findings if not shared)

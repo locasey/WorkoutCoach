@@ -153,6 +153,7 @@ jobs:
                   "STRAVA_REDIRECT_URI": "http://localhost:5000/api/strava/callback",
                   "FRONTEND_URL": "${{ secrets.FRONTEND_URL }}",
                   "CORS_ORIGINS": "${{ secrets.CORS_ORIGINS }}",
+                  "GOOGLE_CLIENT_ID": "${{ secrets.GOOGLE_CLIENT_ID }}",
                   "MAX_WORKOUT_PLANS": "5"
                 }
               }
@@ -235,9 +236,10 @@ jobs:
       - name: Build frontend
         run: |
           cd frontend
-          VITE_API_URL=${{ secrets.BACKEND_URL }} npm run build
+          npm run build
         env:
           VITE_API_URL: ${{ secrets.BACKEND_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
 
       - name: Deploy to S3
         run: |

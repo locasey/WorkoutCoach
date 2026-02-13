@@ -18,7 +18,9 @@
       "Bash(python -m alembic revision:*)",
       "Bash(curl:*)",
       "Bash(python -c:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(\"C:\\\\Users\\\\locas\\\\workoutCoach\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" scripts/list_invite_codes.py)",
+      "mcp__linear-server__list_issue_labels"
     ]
   }
 }

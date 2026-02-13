@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useQuery } from '@tanstack/react-query'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 import { WeekView } from './components/WeekView'
 import { BlockOverview } from './components/BlockOverview'
 import { GoalSetup } from './components/GoalSetup'
 import { CoachMenu } from './components/CoachMenu'
 import { ToastProvider } from './components/Toast'
-import LoginPage from './components/LoginPage'
+import GoogleLoginPage from './components/GoogleLoginPage'
 import { API_BASE_URL } from './config/api'
 import { queryKeys } from './api/queryClient'
 import { API_ROUTES } from './api/routes'
-import { LayoutGrid, Activity, ClipboardList, LogOut, Target } from 'lucide-react'
+import { LayoutGrid, Activity, ClipboardList, Target, User } from 'lucide-react'
+import ProfilePage from './components/ProfilePage'
 import './App.css'
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 // Feature flags - Strava integration disabled by default (LOC-23)
 const STRAVA_ENABLED = import.meta.env.VITE_STRAVA_ENABLED === 'true'
@@ -52,18 +56,11 @@ function App() {
 
       try {
         const response = await axios.get('/api/auth/check')
-        const { authenticated, auth_enabled } = response.data
-
-        // If auth is not enabled, user is always authenticated
-        if (!auth_enabled) {
-          setIsAuthenticated(true)
-        } else {
-          setIsAuthenticated(authenticated)
-          // Clear stored token if session is invalid
-          if (!authenticated && storedToken) {
-            localStorage.removeItem('auth_session')
-            setupAxiosAuth(null)
-          }
+        const { authenticated } = response.data
+        setIsAuthenticated(authenticated)
+        if (!authenticated && storedToken) {
+          localStorage.removeItem('auth_session')
+          setupAxiosAuth(null)
         }
       } catch (err) {
         console.error('Auth check failed:', err)
@@ -143,7 +140,11 @@ function App() {
 
   // Show login page if not authenticated
   if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} />
+    return (
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <GoogleLoginPage onLogin={handleLogin} />
+      </GoogleOAuthProvider>
+    )
   }
 
   return (
@@ -155,14 +156,6 @@ function App() {
               <h1>Workout Coach</h1>
               <p>Plan your work(out), work your plan</p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="logout-button"
-              aria-label="Sign out"
-            >
-              <LogOut className="w-5 h-5" />
-              <span>Sign Out</span>
-            </button>
           </div>
           {/* Desktop nav: horizontal tabs below title; visible only at >=769px */}
           <nav className="desktop-nav hidden md:flex" role="tablist" aria-label="Main navigation">
@@ -208,6 +201,16 @@ function App() {
               <ClipboardList className="w-5 h-5" aria-hidden />
               <span>Plans</span>
             </button>
+            <button
+              id="desktop-tab-profile"
+              role="tab"
+              aria-selected={activeTab === 'profile'}
+              className={activeTab === 'profile' ? 'active' : ''}
+              onClick={() => setActiveTab('profile')}
+            >
+              <User className="w-5 h-5" aria-hidden />
+              <span>Profile</span>
+            </button>
           </nav>
         </header>
 
@@ -221,6 +224,9 @@ function App() {
           )}
           {activeTab === 'plans' && (
             <BlockOverview onStartTraining={() => setShowGoalSetup(true)} />
+          )}
+          {activeTab === 'profile' && (
+            <ProfilePage onLogout={handleLogout} />
           )}
         </main>
 
@@ -291,6 +297,16 @@ function App() {
           >
             <ClipboardList className="w-6 h-6" />
             <span>Plans</span>
+          </button>
+          <button
+            id="tab-profile"
+            role="tab"
+            aria-selected={activeTab === 'profile'}
+            className={activeTab === 'profile' ? 'active' : ''}
+            onClick={() => setActiveTab('profile')}
+          >
+            <User className="w-6 h-6" />
+            <span>Profile</span>
           </button>
         </nav>
       </div>

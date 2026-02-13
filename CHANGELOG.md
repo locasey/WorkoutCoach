@@ -7,7 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Auth bypass**: `App.jsx` destructured `auth_enabled` from `/api/auth/check` but backend never returns it — `undefined` caused all users to skip login. Now uses `authenticated` directly.
+- **User creation race condition**: `create_user()` committed before invite code validation, leaving orphan rows on failure. Now uses `db.flush()` + `db.rollback()` for atomic commit.
+- **Mutable default on User model**: `default={}` on JSONB columns shared one dict across instances. Changed to `default=dict`.
+
+### Security
+- Expired auth sessions cleaned up on backend startup via `cleanup_expired_sessions()`
+- `@app.teardown_request` safety net closes `g.db` if route handler forgets `finally: g.db.close()`
+
 ### Added
+- **Phase 6 Completion: Multi-User Security, Preferences & Profile**
+  - `GET /api/user/profile` — returns authenticated user's profile + preferences
+  - `PUT /api/user/preferences` — validates and saves `available_days`, `experience_level`, `weekly_mileage_comfort` into JSONB
+  - `UserService.update_preferences()` — merges validated preferences into user's JSONB column
+  - `ProfilePage.jsx` + CSS — new tab showing account info (read-only name/email), training day toggles, experience select, mileage input, save + sign-out
+  - Profile tab added to both desktop nav and mobile bottom nav (`User` icon from lucide-react)
+  - `USER` routes added to `api/routes.js` (`PROFILE`, `PREFERENCES`)
+  - `user.profile` query key added to `api/queryClient.js`
+  - `backend/scripts/test_phase6.py` — E2E test script: data isolation, preferences CRUD, session lifecycle, auth headers
+
+### Security
+- **Critical: Cross-user data leakage fixed** — 7 service methods + 10 app.py endpoints now enforce `user_id` filtering
+  - `WorkoutPlanService`: `get_workout_plan()`, `get_workout()`, `toggle_workout_completion()`, `update_workout()` — added `user_id` param + `.filter()`
+  - `WorkoutPlanService.delete_workout()` — simplified to `Workout.user_id` filter (removed indirect plan lookup)
+  - `TrainingBlockService.get_block_by_id()` — added `user_id` param + `.filter()`
+  - `TrainingBlockService.regenerate_week()` — added ownership validation (`block.user_id != user_id`)
+  - Endpoints secured: `GET /api/workout-plans/<id>`, `PUT /api/workouts/<id>/complete`, `PUT /api/workouts/<id>`, `POST /api/workouts/day`, `GET /api/export/excel/<id>`, `PATCH /api/workout-plans/<id>`, `PUT /api/training-block/<id>`, `PUT /api/training-block/<id>/phases`, `DELETE /api/training-block/<id>`, `GET /api/training-block/<id>/overview`
+
+### Changed
+- Logout button moved from app header to ProfilePage (cleaner header, logout via Profile tab)
+- `POST /api/workouts/day` training block path uses `TrainingBlockService.get_block_by_id()` with user_id instead of raw DB query
+
+### Added (prior)
 - Race Day card in `DayCard` — dedicated card type when day matches `target_date` (gold gradient, flag emoji, suppresses Add button)
 - `WORKOUT_TYPES` centralized in `workoutMapper.js` — single source of truth for type values and display labels; `WorkoutEditModal` imports from here instead of defining its own list
 - `formatWorkoutType()` exported from `workoutMapper.js` — used by WorkoutCard, mobile day picker, and edit modal

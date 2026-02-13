@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, make_response
+from flask import Flask, request, jsonify, send_file, make_response, g
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
@@ -14,10 +14,12 @@ from services.workout_plan_service import WorkoutPlanService
 from services.training_block_service import TrainingBlockService
 from services.strava_activity_service import StravaActivityService
 from services.auth_service import (
-    require_auth, is_auth_enabled, validate_credentials,
-    create_session, delete_session, validate_session,
+    require_auth, require_admin, validate_google_token,
+    create_session_for_user, delete_session, get_user_from_session,
     get_session_token_from_request
 )
+from services.user_service import UserService
+from services.invite_code_service import InviteCodeService
 from database import get_db, init_db
 from logging_config import setup_logging, get_logger, log_api_request, log_strava_operation, log_error
 
@@ -46,6 +48,13 @@ else:
 # Configure Flask secret key for sessions
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 
+@app.teardown_request
+def close_db_session(exception=None):
+    """Safety net: close DB session if route handler didn't."""
+    db = getattr(g, 'db', None)
+    if db is not None:
+        db.close()
+
 # Initialize services
 llm_service = LLMService()
 excel_service = ExcelService()
@@ -56,6 +65,11 @@ with app.app_context():
     try:
         init_db()
         logger.info("Database tables initialized successfully")
+        # Clean up expired auth sessions on startup
+        from services.auth_service import cleanup_expired_sessions
+        expired_count = cleanup_expired_sessions()
+        if expired_count > 0:
+            logger.info(f"Cleaned up {expired_count} expired sessions")
     except Exception as e:
         logger.warning(f"Database initialization warning: {str(e)}")
         logger.info("Make sure PostgreSQL is running and DATABASE_URL is set correctly")
@@ -94,76 +108,120 @@ def health_check():
 # Authentication Endpoints
 # ============================================================================
 
-@app.route('/api/auth/login', methods=['POST'])
-def auth_login():
+@app.route('/api/auth/google', methods=['POST'])
+def auth_google():
     """
-    Login endpoint - validates credentials and returns session token.
+    Unified Google OAuth login/signup endpoint.
 
     Request body:
         {
-            "username": "string",
-            "password": "string"
+            "credential": "google_id_token",
+            "invite_code": "optional_invite_code",
+            "consent": true  // required for new users
         }
 
     Returns:
-        {
-            "message": "Login successful",
-            "session_token": "string"
-        }
+        200: { session_token, user } — existing user logged in
+        201: { session_token, user } — new user created with invite code
+        403: { code: "INVITE_REQUIRED" } — new user, no invite code
+        400: Invalid token or invite code
     """
-    # If auth is not enabled, return success immediately
-    if not is_auth_enabled():
-        return jsonify({
-            "message": "Authentication not enabled",
-            "session_token": None,
-            "auth_enabled": False
-        })
-
     data = request.json
-    if not data:
-        return jsonify({"error": "Request body required"}), 400
+    if not data or 'credential' not in data:
+        return jsonify({"error": "Google credential required"}), 400
 
-    username = data.get('username', '')
-    password = data.get('password', '')
+    try:
+        google_info = validate_google_token(data['credential'])
+    except ValueError as e:
+        logger.warning(f"Google token validation failed: {e}")
+        return jsonify({"error": str(e)}), 400
 
-    if not username or not password:
-        return jsonify({"error": "Username and password required"}), 400
+    db = next(get_db())
+    try:
+        # Try to find existing user
+        user, _ = UserService.get_or_create_by_google(
+            db,
+            google_id=google_info['google_id'],
+            email=google_info['email'],
+            name=google_info['name']
+        )
 
-    if not validate_credentials(username, password):
-        logger.warning(f"Failed login attempt for user: {username}")
-        return jsonify({"error": "Invalid credentials"}), 401
+        if user:
+            # Existing user — create session and return
+            session_token = create_session_for_user(db, user.id)
+            logger.info(f"User logged in: {user.email}")
 
-    # Create session
-    session_token = create_session()
-    logger.info(f"User logged in: {username}")
+            response = jsonify({
+                "message": "Login successful",
+                "session_token": session_token,
+                "user": user.to_dict()
+            })
+            response.set_cookie(
+                'auth_session', session_token,
+                httponly=True,
+                secure=os.getenv('FLASK_ENV') == 'production',
+                samesite='Lax',
+                max_age=86400
+            )
+            return response
 
-    response = jsonify({
-        "message": "Login successful",
-        "session_token": session_token,
-        "auth_enabled": True
-    })
+        # New user — check for invite code
+        invite_code = data.get('invite_code')
+        consent = data.get('consent', False)
 
-    # Also set cookie for convenience
-    response.set_cookie(
-        'auth_session',
-        session_token,
-        httponly=True,
-        secure=os.getenv('FLASK_ENV') == 'production',
-        samesite='Lax',
-        max_age=86400  # 24 hours
-    )
+        if not invite_code:
+            return jsonify({
+                "code": "INVITE_REQUIRED",
+                "message": "An invite code is required to create an account"
+            }), 403
 
-    return response
+        if not consent:
+            return jsonify({"error": "You must agree to the terms to create an account"}), 400
+
+        # Create the user first (need user_id for invite code redemption)
+        new_user = UserService.create_user(
+            db,
+            google_id=google_info['google_id'],
+            email=google_info['email'],
+            name=google_info['name'],
+            role='beta_tester',
+            invite_code_used=invite_code
+        )
+
+        # Validate and use the invite code
+        used_invite = InviteCodeService.validate_and_use(db, invite_code, new_user.id)
+        if not used_invite:
+            db.rollback()
+            return jsonify({"error": "Invalid or expired invite code"}), 400
+
+        session_token = create_session_for_user(db, new_user.id)
+        logger.info(f"New user created: {new_user.email}")
+
+        response = jsonify({
+            "message": "Account created successfully",
+            "session_token": session_token,
+            "user": new_user.to_dict()
+        })
+        response.set_cookie(
+            'auth_session', session_token,
+            httponly=True,
+            secure=os.getenv('FLASK_ENV') == 'production',
+            samesite='Lax',
+            max_age=86400
+        )
+        return response, 201
+
+    except Exception as e:
+        db.rollback()
+        log_error("Error in Google auth", e)
+        return jsonify({"error": "Authentication failed"}), 500
+    finally:
+        db.close()
 
 
 @app.route('/api/auth/logout', methods=['POST'])
 def auth_logout():
-    """
-    Logout endpoint - invalidates the current session.
-
-    Returns:
-        {"message": "Logged out successfully"}
-    """
+    """Logout endpoint - invalidates the current session."""
     token = get_session_token_from_request()
 
     if token:
@@ -171,51 +229,107 @@ def auth_logout():
         logger.info("User logged out")
 
     response = jsonify({"message": "Logged out successfully"})
-
-    # Clear the cookie
     response.delete_cookie('auth_session')
-
     return response
 
 
 @app.route('/api/auth/check', methods=['GET'])
 def auth_check():
-    """
-    Check if current session is valid.
-
-    Returns:
-        {
-            "authenticated": bool,
-            "auth_enabled": bool,
-            "message": "string"
-        }
-    """
-    auth_enabled = is_auth_enabled()
-
-    # If auth is not enabled, always return authenticated
-    if not auth_enabled:
-        return jsonify({
-            "authenticated": True,
-            "auth_enabled": False,
-            "message": "Authentication not enabled"
-        })
-
+    """Check if current session is valid. Returns user object if authenticated."""
     token = get_session_token_from_request()
 
     if not token:
         return jsonify({
             "authenticated": False,
-            "auth_enabled": True,
             "message": "No session token provided"
         })
 
-    is_valid = validate_session(token)
+    db = next(get_db())
+    try:
+        user = get_user_from_session(db, token)
 
-    return jsonify({
-        "authenticated": is_valid,
-        "auth_enabled": True,
-        "message": "Session valid" if is_valid else "Session invalid or expired"
-    })
+        if not user:
+            return jsonify({
+                "authenticated": False,
+                "message": "Session invalid or expired"
+            })
+
+        return jsonify({
+            "authenticated": True,
+            "user": user.to_dict(),
+            "message": "Session valid"
+        })
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/invite-codes', methods=['POST'])
+@require_auth
+@require_admin
+def generate_invite_code():
+    """Generate a new invite code (admin only)."""
+    try:
+        invite = InviteCodeService.generate_code(g.db, created_by=g.current_user_id)
+        logger.info(f"Invite code generated by {g.current_user.email}: {invite.code}")
+        return jsonify({
+            "invite_code": invite.to_dict(),
+            "message": "Invite code generated"
+        }), 201
+    finally:
+        g.db.close()
+
+
+@app.route('/api/admin/invite-codes', methods=['GET'])
+@require_auth
+@require_admin
+def list_invite_codes():
+    """List all invite codes (admin only)."""
+    try:
+        codes = InviteCodeService.get_all_codes(g.db)
+        return jsonify({
+            "invite_codes": [c.to_dict() for c in codes],
+            "count": len(codes)
+        })
+    finally:
+        g.db.close()
+
+
+# ============================================================================
+# User Profile & Preferences
+# ============================================================================
+
+@app.route('/api/user/profile', methods=['GET'])
+@require_auth
+def get_user_profile():
+    """Get the current user's profile."""
+    try:
+        user = UserService.get_by_id(g.db, g.current_user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        return jsonify({"user": user.to_dict()})
+    finally:
+        g.db.close()
+
+
+@app.route('/api/user/preferences', methods=['PUT'])
+@require_auth
+def update_user_preferences():
+    """Update the current user's preferences."""
+    try:
+        data = request.json
+        if data is None:
+            return jsonify({"error": "Request body is required"}), 400
+
+        try:
+            user = UserService.update_preferences(g.db, g.current_user_id, data)
+            return jsonify({
+                "user": user.to_dict(),
+                "message": "Preferences updated successfully"
+            })
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+    finally:
+        g.db.close()
 
 
 # ============================================================================
@@ -235,10 +349,9 @@ def chat():
             return jsonify({"error": "Message is required"}), 400
 
         # Check plan limit before creating
-        db = next(get_db())
         try:
             max_plans = int(os.getenv('MAX_WORKOUT_PLANS', 5))
-            limit_check = WorkoutPlanService.check_plan_limit(db, max_plans)
+            limit_check = WorkoutPlanService.check_plan_limit(g.db, max_plans, g.current_user_id)
 
             if limit_check['at_limit']:
                 return jsonify({
@@ -254,9 +367,9 @@ def chat():
 
             # Save to database
             workout_plan = WorkoutPlanService.create_workout_plan(
-                db=db,
+                db=g.db,
                 plan_data=workout_plan_data,
-                user_id=None  # Single user for MVP
+                user_id=g.current_user_id
             )
 
             # Convert to dict for response
@@ -270,7 +383,7 @@ def chat():
                 "message": "Workout plan generated and saved successfully"
             })
         finally:
-            db.close()
+            g.db.close()
 
     except Exception as e:
         log_error("Error in chat endpoint", e)
@@ -286,9 +399,8 @@ def chat():
 def get_all_workout_plans():
     """Get all workout plans"""
     try:
-        db = next(get_db())
         try:
-            plans = WorkoutPlanService.get_all_workout_plans(db, user_id=None)
+            plans = WorkoutPlanService.get_all_workout_plans(g.db, user_id=g.current_user_id)
             max_plans = int(os.getenv('MAX_WORKOUT_PLANS', 5))
 
             plans_data = []
@@ -303,7 +415,7 @@ def get_all_workout_plans():
                 "max_allowed": max_plans
             })
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error getting workout plans", e)
         return jsonify({"error": str(e)}), 500
@@ -314,9 +426,8 @@ def get_all_workout_plans():
 def get_active_workout_plan():
     """Get the currently active workout plan"""
     try:
-        db = next(get_db())
         try:
-            plan = WorkoutPlanService.get_active_workout_plan(db, user_id=None)
+            plan = WorkoutPlanService.get_active_workout_plan(g.db, user_id=g.current_user_id)
 
             if not plan:
                 return jsonify({
@@ -332,7 +443,7 @@ def get_active_workout_plan():
                 "message": "Active workout plan retrieved successfully"
             })
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error getting active workout plan", e)
         return jsonify({"error": str(e)}), 500
@@ -343,10 +454,9 @@ def get_active_workout_plan():
 def get_workout_plan(plan_id):
     """Retrieve a specific workout plan by ID"""
     try:
-        db = next(get_db())
         try:
             plan_uuid = uuid.UUID(plan_id)
-            plan = WorkoutPlanService.get_workout_plan(db, plan_uuid)
+            plan = WorkoutPlanService.get_workout_plan(g.db, plan_uuid, user_id=g.current_user_id)
 
             if not plan:
                 return jsonify({"error": "Workout plan not found"}), 404
@@ -361,7 +471,7 @@ def get_workout_plan(plan_id):
         except ValueError as e:
             return jsonify({"error": f"Invalid plan ID: {str(e)}"}), 400
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error getting workout plan", e)
         return jsonify({"error": str(e)}), 500
@@ -372,10 +482,9 @@ def get_workout_plan(plan_id):
 def activate_workout_plan(plan_id):
     """Set a workout plan as active (deactivates all others)"""
     try:
-        db = next(get_db())
         try:
             plan_uuid = uuid.UUID(plan_id)
-            plan = WorkoutPlanService.set_active_workout_plan(db, plan_uuid, user_id=None)
+            plan = WorkoutPlanService.set_active_workout_plan(g.db, plan_uuid, user_id=g.current_user_id)
 
             plan_dict = plan.to_dict()
             plan_dict['workouts'] = [w.to_dict() for w in plan.workouts]
@@ -390,7 +499,7 @@ def activate_workout_plan(plan_id):
                 return jsonify({"error": str(e)}), 404
             return jsonify({"error": f"Invalid plan ID: {str(e)}"}), 400
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error activating workout plan", e)
         return jsonify({"error": str(e)}), 500
@@ -415,18 +524,17 @@ def update_workout_plan(plan_id):
         if data is None:
             return jsonify({"error": "Request body is required"}), 400
 
-        db = next(get_db())
         try:
             plan_uuid = uuid.UUID(plan_id)
 
             # Currently only name is editable
             if 'name' in data:
                 plan = WorkoutPlanService.update_workout_plan_name(
-                    db, plan_uuid, data['name'], user_id=None
+                    g.db, plan_uuid, data['name'], user_id=g.current_user_id
                 )
             else:
                 # If no fields to update, just return the current plan
-                plan = WorkoutPlanService.get_workout_plan(db, plan_uuid)
+                plan = WorkoutPlanService.get_workout_plan(g.db, plan_uuid, user_id=g.current_user_id)
                 if not plan:
                     return jsonify({"error": "Workout plan not found"}), 404
 
@@ -444,7 +552,7 @@ def update_workout_plan(plan_id):
                 return jsonify({"error": error_msg}), 404
             return jsonify({"error": error_msg}), 400
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error updating workout plan", e)
         return jsonify({"error": str(e)}), 500
@@ -455,10 +563,9 @@ def update_workout_plan(plan_id):
 def delete_workout_plan(plan_id):
     """Delete a workout plan (cannot delete active plan)"""
     try:
-        db = next(get_db())
         try:
             plan_uuid = uuid.UUID(plan_id)
-            deleted = WorkoutPlanService.delete_workout_plan(db, plan_uuid, user_id=None)
+            deleted = WorkoutPlanService.delete_workout_plan(g.db, plan_uuid, user_id=g.current_user_id)
 
             if not deleted:
                 return jsonify({"error": "Workout plan not found"}), 404
@@ -473,7 +580,7 @@ def delete_workout_plan(plan_id):
                 return jsonify({"error": str(e)}), 400
             return jsonify({"error": f"Invalid plan ID: {str(e)}"}), 400
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error deleting workout plan", e)
         return jsonify({"error": str(e)}), 500
@@ -488,9 +595,8 @@ def delete_workout_plan(plan_id):
 def get_training_block():
     """Get the current active training block (or null if in maintenance mode)"""
     try:
-        db = next(get_db())
         try:
-            block = TrainingBlockService.get_active_block(db, user_id=None)
+            block = TrainingBlockService.get_active_block(g.db, user_id=g.current_user_id)
 
             if not block:
                 return jsonify({
@@ -505,7 +611,7 @@ def get_training_block():
                 "message": "Active training block retrieved"
             })
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error getting training block", e)
         return jsonify({"error": str(e)}), 500
@@ -523,7 +629,6 @@ def create_training_block():
             if field not in data:
                 return jsonify({"error": f"Missing required field: {field}"}), 400
 
-        db = next(get_db())
         try:
             from datetime import datetime
             target_date = datetime.strptime(data['target_date'], '%Y-%m-%d').date()
@@ -532,14 +637,14 @@ def create_training_block():
                 start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
 
             block = TrainingBlockService.create_training_block(
-                db=db,
+                db=g.db,
                 event_name=data['event_name'],
                 event_distance=data['event_distance'],
                 target_date=target_date,
                 total_weeks=data['total_weeks'],
                 phase_map=data['phase_map'],
                 start_date=start_date,
-                user_id=None
+                user_id=g.current_user_id
             )
 
             logger.info(f"Created training block: {block.id} for {data['event_name']}")
@@ -548,7 +653,7 @@ def create_training_block():
                 "message": "Training block created successfully"
             }), 201
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error creating training block", e)
         return jsonify({"error": str(e)}), 500
@@ -560,13 +665,13 @@ def update_training_block(block_id):
     """Update a training block"""
     try:
         data = request.get_json()
-        db = next(get_db())
         try:
             block_uuid = uuid.UUID(block_id)
-            block = TrainingBlockService.update_training_block(db, block_uuid, **data)
-
-            if not block:
+            # Verify ownership before updating
+            existing = TrainingBlockService.get_block_by_id(g.db, block_uuid, user_id=g.current_user_id)
+            if not existing:
                 return jsonify({"error": "Training block not found"}), 404
+            block = TrainingBlockService.update_training_block(g.db, block_uuid, **data)
 
             logger.info(f"Updated training block: {block_id}")
             return jsonify({
@@ -576,7 +681,7 @@ def update_training_block(block_id):
         except ValueError as e:
             return jsonify({"error": f"Invalid block ID: {str(e)}"}), 400
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error updating training block", e)
         return jsonify({"error": str(e)}), 500
@@ -592,13 +697,13 @@ def update_training_block_phases(block_id):
         if 'phase_map' not in data:
             return jsonify({"error": "Missing required field: phase_map"}), 400
 
-        db = next(get_db())
         try:
             block_uuid = uuid.UUID(block_id)
-            block = TrainingBlockService.update_phases(db, block_uuid, data['phase_map'])
-
-            if not block:
+            # Verify ownership before updating phases
+            existing = TrainingBlockService.get_block_by_id(g.db, block_uuid, user_id=g.current_user_id)
+            if not existing:
                 return jsonify({"error": "Training block not found"}), 404
+            block = TrainingBlockService.update_phases(g.db, block_uuid, data['phase_map'])
 
             logger.info(f"Updated phases for training block: {block_id}")
             return jsonify({
@@ -608,7 +713,7 @@ def update_training_block_phases(block_id):
         except ValueError as e:
             return jsonify({"error": f"Invalid block ID: {str(e)}"}), 400
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error updating training block phases", e)
         return jsonify({"error": str(e)}), 500
@@ -622,13 +727,13 @@ def delete_training_block(block_id):
         data = request.get_json() or {}
         completed = data.get('completed', False)
 
-        db = next(get_db())
         try:
             block_uuid = uuid.UUID(block_id)
-            block = TrainingBlockService.end_training_block(db, block_uuid, completed=completed)
-
-            if not block:
+            # Verify ownership before ending
+            existing = TrainingBlockService.get_block_by_id(g.db, block_uuid, user_id=g.current_user_id)
+            if not existing:
                 return jsonify({"error": "Training block not found"}), 404
+            block = TrainingBlockService.end_training_block(g.db, block_uuid, completed=completed)
 
             status = "completed" if completed else "abandoned"
             logger.info(f"Ended training block: {block_id} (status: {status})")
@@ -639,7 +744,7 @@ def delete_training_block(block_id):
         except ValueError as e:
             return jsonify({"error": f"Invalid block ID: {str(e)}"}), 400
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error ending training block", e)
         return jsonify({"error": str(e)}), 500
@@ -650,19 +755,19 @@ def delete_training_block(block_id):
 def get_training_block_overview(block_id):
     """Get full training block overview for visualization"""
     try:
-        db = next(get_db())
         try:
             block_uuid = uuid.UUID(block_id)
-            overview = TrainingBlockService.get_block_overview(db, block_uuid)
-
-            if not overview:
+            # Verify ownership before returning overview
+            existing = TrainingBlockService.get_block_by_id(g.db, block_uuid, user_id=g.current_user_id)
+            if not existing:
                 return jsonify({"error": "Training block not found"}), 404
+            overview = TrainingBlockService.get_block_overview(g.db, block_uuid)
 
             return jsonify(overview)
         except ValueError as e:
             return jsonify({"error": f"Invalid block ID: {str(e)}"}), 400
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error getting training block overview", e)
         return jsonify({"error": str(e)}), 500
@@ -680,12 +785,11 @@ def get_week_view():
     try:
         offset = request.args.get('offset', 0, type=int)
 
-        db = next(get_db())
         try:
-            context = TrainingBlockService.get_week_context(db, week_offset=offset, user_id=None)
+            context = TrainingBlockService.get_week_context(g.db, week_offset=offset, user_id=g.current_user_id)
             return jsonify(context)
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error getting week view", e)
         return jsonify({"error": str(e)}), 500
@@ -699,22 +803,22 @@ def generate_block_workouts(block_id):
         data = request.json or {}
         experience_level = data.get('experience_level', 'intermediate')
 
-        db = next(get_db())
         try:
             from services.periodized_workout_service import PeriodizedWorkoutService
             block_uuid = uuid.UUID(block_id)
             result = PeriodizedWorkoutService.generate_workouts_for_block(
-                db=db,
+                db=g.db,
                 block_id=block_uuid,
                 experience_level=experience_level,
-                llm_service=llm_service
+                llm_service=llm_service,
+                user_id=g.current_user_id
             )
             logger.info(f"Generated {result['workouts_created']} workouts for block {block_id}")
             return jsonify(result)
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
         finally:
-            db.close()
+            g.db.close()
     except ValueError as e:
         return jsonify({"error": f"Invalid block ID: {str(e)}"}), 400
     except Exception as e:
@@ -734,26 +838,26 @@ def regenerate_week():
         week_offset = data.get('week_offset', 0)
         reason = data.get('reason', '')
 
-        db = next(get_db())
         try:
             # Get active block
-            block = TrainingBlockService.get_active_block(db, user_id=None)
+            block = TrainingBlockService.get_active_block(g.db, user_id=g.current_user_id)
             if not block:
                 return jsonify({"error": "No active training block"}), 400
 
             result = TrainingBlockService.regenerate_week(
-                db=db,
+                db=g.db,
                 block_id=block.id,
                 week_offset=week_offset,
                 reason=reason,
-                llm_service=llm_service
+                llm_service=llm_service,
+                user_id=g.current_user_id
             )
             logger.info(f"Regenerated week (offset={week_offset}) for block {block.id}")
             return jsonify(result)
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error regenerating week", e)
         return jsonify({"error": str(e)}), 500
@@ -764,10 +868,9 @@ def regenerate_week():
 def export_excel(plan_id):
     """Export workout plan to Excel"""
     try:
-        db = next(get_db())
         try:
             plan_uuid = uuid.UUID(plan_id)
-            plan = WorkoutPlanService.get_workout_plan(db, plan_uuid)
+            plan = WorkoutPlanService.get_workout_plan(g.db, plan_uuid, user_id=g.current_user_id)
 
             if not plan:
                 return jsonify({"error": "Workout plan not found"}), 404
@@ -788,7 +891,7 @@ def export_excel(plan_id):
         except ValueError as e:
             return jsonify({"error": f"Invalid plan ID: {str(e)}"}), 400
         finally:
-            db.close()
+            g.db.close()
 
     except Exception as e:
         log_error("Error exporting Excel", e)
@@ -804,10 +907,9 @@ def export_excel(plan_id):
 def get_workouts_current_week():
     """Get workouts for the current calendar week"""
     try:
-        db = next(get_db())
         try:
             week_start, week_end = WorkoutPlanService.get_week_start_end()
-            workouts = WorkoutPlanService.get_workouts_for_week(db, week_start, week_end, user_id=None)
+            workouts = WorkoutPlanService.get_workouts_for_week(g.db, week_start, week_end, user_id=g.current_user_id)
 
             return jsonify({
                 'week_start': week_start.isoformat(),
@@ -816,7 +918,7 @@ def get_workouts_current_week():
                 'count': len(workouts)
             })
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error fetching current week workouts", e)
         return jsonify({"error": str(e)}), 500
@@ -827,10 +929,9 @@ def get_workouts_current_week():
 def get_workouts_week_offset(week_offset):
     """Get workouts for a specific week by offset (0=current, -1=last, +1=next)"""
     try:
-        db = next(get_db())
         try:
             week_start, week_end = WorkoutPlanService.get_week_by_offset(week_offset)
-            workouts = WorkoutPlanService.get_workouts_for_week(db, week_start, week_end, user_id=None)
+            workouts = WorkoutPlanService.get_workouts_for_week(g.db, week_start, week_end, user_id=g.current_user_id)
 
             return jsonify({
                 'week_offset': week_offset,
@@ -840,7 +941,7 @@ def get_workouts_week_offset(week_offset):
                 'count': len(workouts)
             })
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error fetching week workouts", e)
         return jsonify({"error": str(e)}), 500
@@ -855,9 +956,8 @@ def get_workouts_month(year, month):
         if month < 1 or month > 12:
             return jsonify({"error": "Month must be between 1 and 12"}), 400
 
-        db = next(get_db())
         try:
-            workouts = WorkoutPlanService.get_workouts_for_month(db, year, month, user_id=None)
+            workouts = WorkoutPlanService.get_workouts_for_month(g.db, year, month, user_id=g.current_user_id)
 
             return jsonify({
                 'year': year,
@@ -866,7 +966,7 @@ def get_workouts_month(year, month):
                 'count': len(workouts)
             })
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error fetching month workouts", e)
         return jsonify({"error": str(e)}), 500
@@ -877,9 +977,8 @@ def get_workouts_month(year, month):
 def toggle_workout_completion(workout_id):
     """Toggle workout completion status"""
     try:
-        db = next(get_db())
         try:
-            workout = WorkoutPlanService.toggle_workout_completion(db, uuid.UUID(workout_id))
+            workout = WorkoutPlanService.toggle_workout_completion(g.db, uuid.UUID(workout_id), user_id=g.current_user_id)
             logger.debug(f"Toggled workout completion: {workout_id} -> {workout.is_completed}")
             return jsonify({
                 'workout': workout.to_dict(),
@@ -888,7 +987,7 @@ def toggle_workout_completion(workout_id):
         except ValueError as e:
             return jsonify({"error": str(e)}), 404
         finally:
-            db.close()
+            g.db.close()
     except ValueError as e:
         return jsonify({"error": f"Invalid workout ID: {str(e)}"}), 400
     except Exception as e:
@@ -901,17 +1000,16 @@ def toggle_workout_completion(workout_id):
 def get_week_progress():
     """Get progress summary for the current week"""
     try:
-        db = next(get_db())
         try:
             # Get current week by default, or allow week_offset query param
             week_offset = request.args.get('week_offset', type=int, default=0)
             week_start, week_end = WorkoutPlanService.get_week_by_offset(week_offset)
 
-            progress = WorkoutPlanService.get_week_progress(db, week_start, week_end, user_id=None)
+            progress = WorkoutPlanService.get_week_progress(g.db, week_start, week_end, user_id=g.current_user_id)
 
             return jsonify(progress)
         finally:
-            db.close()
+            g.db.close()
     except Exception as e:
         log_error("Error fetching week progress", e)
         return jsonify({"error": str(e)}), 500
@@ -933,9 +1031,8 @@ def update_workout(workout_id):
         # Allow empty body (no fields to update)
         if not data:
             # Just return the workout as-is
-            db = next(get_db())
             try:
-                workout = WorkoutPlanService.get_workout(db, uuid.UUID(workout_id))
+                workout = WorkoutPlanService.get_workout(g.db, uuid.UUID(workout_id), user_id=g.current_user_id)
                 if not workout:
                     return jsonify({"error": f"Workout with id {workout_id} not found"}), 404
                 return jsonify({
@@ -943,11 +1040,10 @@ def update_workout(workout_id):
                     'message': 'No fields to update'
                 })
             finally:
-                db.close()
+                g.db.close()
 
-        db = next(get_db())
         try:
-            workout = WorkoutPlanService.update_workout(db, uuid.UUID(workout_id), data)
+            workout = WorkoutPlanService.update_workout(g.db, uuid.UUID(workout_id), data, user_id=g.current_user_id)
             logger.debug(f"Updated workout: {workout_id}")
             return jsonify({
                 'workout': workout.to_dict(),
@@ -961,7 +1057,7 @@ def update_workout(workout_id):
                 # Validation errors
                 return jsonify({"error": error_msg}), 400
         finally:
-            db.close()
+            g.db.close()
     except ValueError as e:
         return jsonify({"error": f"Invalid workout ID: {str(e)}"}), 400
     except Exception as e:
@@ -1006,16 +1102,14 @@ def add_workout_to_day():
         if not training_block_id and not workout_plan_id:
             return jsonify({"error": "Either training_block_id or workout_plan_id is required"}), 400
 
-        db = next(get_db())
         try:
             if training_block_id:
                 # New architecture: add workout to training block
-                from models.training_block import TrainingBlock
                 from models.workout import Workout
                 block_uuid = uuid.UUID(training_block_id)
-                block = db.query(TrainingBlock).filter(TrainingBlock.id == block_uuid).first()
+                block = TrainingBlockService.get_block_by_id(g.db, block_uuid, user_id=g.current_user_id)
                 if not block:
-                    return jsonify({"error": f"Training block not found"}), 404
+                    return jsonify({"error": "Training block not found"}), 404
                 if block.status != 'active':
                     return jsonify({"error": "Training block is not active"}), 400
 
@@ -1023,7 +1117,7 @@ def add_workout_to_day():
                 scheduled_date = dt.fromisoformat(data['scheduled_date']).date()
 
                 # Check existing workouts for this day (max 2)
-                existing = db.query(Workout).filter(
+                existing = g.db.query(Workout).filter(
                     Workout.training_block_id == block_uuid,
                     Workout.scheduled_date == scheduled_date
                 ).order_by(Workout.slot.asc().nullslast()).all()
@@ -1064,18 +1158,19 @@ def add_workout_to_day():
                     pace=data.get('pace'),
                     notes=data.get('notes'),
                     scheduled_date=scheduled_date,
+                    user_id=g.current_user_id
                 )
-                db.add(workout)
-                db.commit()
-                db.refresh(workout)
+                g.db.add(workout)
+                g.db.commit()
+                g.db.refresh(workout)
             else:
                 # Legacy path: workout plan
                 workout = WorkoutPlanService.add_workout_to_day(
-                    db=db,
+                    db=g.db,
                     workout_plan_id=uuid.UUID(workout_plan_id),
                     scheduled_date=data['scheduled_date'],
                     workout_data=data,
-                    user_id=None
+                    user_id=g.current_user_id
                 )
 
             logger.info(f"Added workout to day: {data['scheduled_date']} (slot={workout.slot})")
@@ -1089,7 +1184,7 @@ def add_workout_to_day():
                 return jsonify({"error": error_msg}), 404
             return jsonify({"error": error_msg}), 400
         finally:
-            db.close()
+            g.db.close()
 
     except ValueError as e:
         return jsonify({"error": f"Invalid ID format: {str(e)}"}), 400
@@ -1111,9 +1206,8 @@ def delete_workout(workout_id):
         Success message with deleted workout ID
     """
     try:
-        db = next(get_db())
         try:
-            WorkoutPlanService.delete_workout(db, uuid.UUID(workout_id), user_id=None)
+            WorkoutPlanService.delete_workout(g.db, uuid.UUID(workout_id), user_id=g.current_user_id)
 
             logger.info(f"Deleted workout: {workout_id}")
             return jsonify({
@@ -1126,7 +1220,7 @@ def delete_workout(workout_id):
                 return jsonify({"error": error_msg}), 404
             return jsonify({"error": error_msg}), 400
         finally:
-            db.close()
+            g.db.close()
 
     except ValueError as e:
         return jsonify({"error": f"Invalid workout ID: {str(e)}"}), 400
@@ -1148,10 +1242,9 @@ def get_workouts_for_day(scheduled_date):
         List of workouts for the day, ordered by slot
     """
     try:
-        db = next(get_db())
         try:
             # Get active plan
-            active_plan = WorkoutPlanService.get_active_workout_plan(db, user_id=None)
+            active_plan = WorkoutPlanService.get_active_workout_plan(g.db, user_id=g.current_user_id)
             if not active_plan:
                 return jsonify({
                     'workouts': [],
@@ -1167,7 +1260,7 @@ def get_workouts_for_day(scheduled_date):
                 return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
 
             workouts = WorkoutPlanService.get_workouts_for_day(
-                db, active_plan.id, target_date
+                g.db, active_plan.id, target_date
             )
 
             return jsonify({
@@ -1176,7 +1269,7 @@ def get_workouts_for_day(scheduled_date):
                 'count': len(workouts)
             })
         finally:
-            db.close()
+            g.db.close()
 
     except Exception as e:
         log_error("Error getting workouts for day", e)
@@ -1391,9 +1484,8 @@ def get_strava_activities():
         if not session_token:
             return jsonify({"error": "Session token required"}), 401
 
-        db = next(get_db())
         try:
-            session = StravaActivityService.get_session_by_token(db, session_token)
+            session = StravaActivityService.get_session_by_token(g.db, session_token)
             if not session:
                 return jsonify({"error": "Invalid session"}), 401
 
@@ -1405,7 +1497,7 @@ def get_strava_activities():
             raw_activities = strava_service.get_activities(session.access_token)
 
             # Import activities to database
-            imported = StravaActivityService.import_activities(db, raw_activities, user_id=None)
+            imported = StravaActivityService.import_activities(g.db, raw_activities, user_id=g.current_user_id)
 
             log_strava_operation("fetch_activities", f"Imported {len(imported)} activities")
 
@@ -1414,7 +1506,7 @@ def get_strava_activities():
                 "count": len(imported)
             })
         finally:
-            db.close()
+            g.db.close()
 
     except Exception as e:
         log_error("Error fetching Strava activities", e)
@@ -1430,10 +1522,9 @@ def get_stored_activities():
         limit = request.args.get('limit', type=int, default=100)
         offset = request.args.get('offset', type=int, default=0)
 
-        db = next(get_db())
         try:
-            activities = StravaActivityService.get_all_activities(db, user_id=None, limit=limit, offset=offset)
-            total_count = StravaActivityService.get_activity_count(db, user_id=None)
+            activities = StravaActivityService.get_all_activities(g.db, user_id=g.current_user_id, limit=limit, offset=offset)
+            total_count = StravaActivityService.get_activity_count(g.db, user_id=g.current_user_id)
 
             return jsonify({
                 "activities": [a.to_dict() for a in activities],
@@ -1441,7 +1532,7 @@ def get_stored_activities():
                 "total_count": total_count
             })
         finally:
-            db.close()
+            g.db.close()
 
     except Exception as e:
         log_error("Error getting stored activities", e)
@@ -1460,10 +1551,9 @@ def link_activity_to_workout(activity_id):
         if not workout_id:
             return jsonify({"error": "workout_id is required"}), 400
 
-        db = next(get_db())
         try:
             activity = StravaActivityService.link_activity_to_workout(
-                db, uuid.UUID(activity_id), uuid.UUID(workout_id)
+                g.db, uuid.UUID(activity_id), uuid.UUID(workout_id)
             )
             log_strava_operation("link_activity", f"Linked activity {activity_id} to workout {workout_id}")
             return jsonify({
@@ -1473,7 +1563,7 @@ def link_activity_to_workout(activity_id):
         except ValueError as e:
             return jsonify({"error": str(e)}), 404
         finally:
-            db.close()
+            g.db.close()
 
     except ValueError as e:
         return jsonify({"error": f"Invalid ID format: {str(e)}"}), 400
@@ -1488,9 +1578,8 @@ def unlink_activity(activity_id):
     """Unlink a Strava activity from its workout"""
     check_strava_enabled()
     try:
-        db = next(get_db())
         try:
-            activity = StravaActivityService.unlink_activity(db, uuid.UUID(activity_id))
+            activity = StravaActivityService.unlink_activity(g.db, uuid.UUID(activity_id))
             log_strava_operation("unlink_activity", f"Unlinked activity {activity_id}")
             return jsonify({
                 "activity": activity.to_dict(),
@@ -1499,7 +1588,7 @@ def unlink_activity(activity_id):
         except ValueError as e:
             return jsonify({"error": str(e)}), 404
         finally:
-            db.close()
+            g.db.close()
 
     except ValueError as e:
         return jsonify({"error": f"Invalid activity ID: {str(e)}"}), 400
@@ -1517,11 +1606,10 @@ def import_strava_activities():
         data = request.json
         activity_ids = data.get('activity_ids', [])
 
-        db = next(get_db())
         try:
             imported = []
             for strava_id in activity_ids:
-                activity = StravaActivityService.get_activity_by_strava_id(db, str(strava_id))
+                activity = StravaActivityService.get_activity_by_strava_id(g.db, str(strava_id))
                 if activity:
                     imported.append(activity.to_dict())
 
@@ -1530,7 +1618,7 @@ def import_strava_activities():
                 "activities": imported
             })
         finally:
-            db.close()
+            g.db.close()
 
     except Exception as e:
         log_error("Error importing activities", e)

@@ -69,6 +69,7 @@ class UserService:
 
     VALID_DAYS = {'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'}
     VALID_EXPERIENCE_LEVELS = {'beginner', 'intermediate', 'advanced'}
+    VALID_DISTANCE_UNITS = {'mi', 'km'}
 
     @staticmethod
     def update_preferences(db: Session, user_id: uuid.UUID, preferences: dict) -> User:
@@ -98,19 +99,24 @@ class UserService:
 
         if 'weekly_mileage_comfort' in preferences:
             mileage = preferences['weekly_mileage_comfort']
-            try:
-                mileage = float(mileage)
-                if mileage < 0:
-                    errors['weekly_mileage_comfort'] = "Must be a non-negative number"
-            except (TypeError, ValueError):
-                errors['weekly_mileage_comfort'] = "Must be a valid number"
+            if mileage is not None:
+                try:
+                    mileage = float(mileage)
+                    if mileage < 0:
+                        errors['weekly_mileage_comfort'] = "Must be a non-negative number"
+                except (TypeError, ValueError):
+                    errors['weekly_mileage_comfort'] = "Must be a valid number"
+
+        if 'distance_unit' in preferences:
+            if preferences['distance_unit'] not in UserService.VALID_DISTANCE_UNITS:
+                errors['distance_unit'] = f"Must be one of: {', '.join(sorted(UserService.VALID_DISTANCE_UNITS))}"
 
         if errors:
             raise ValueError(f"Validation errors: {'; '.join(f'{k}: {v}' for k, v in errors.items())}")
 
         # Merge into existing preferences
         current = dict(user.preferences) if user.preferences else {}
-        allowed_keys = {'available_days', 'experience_level', 'weekly_mileage_comfort'}
+        allowed_keys = {'available_days', 'experience_level', 'weekly_mileage_comfort', 'distance_unit'}
         for key in allowed_keys:
             if key in preferences:
                 current[key] = preferences[key]

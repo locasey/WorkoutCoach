@@ -102,6 +102,16 @@ If not — it waits.
 - **External APIs**: Strava OAuth
 - **Migrations**: Alembic
 
+## Codebase Exploration Rules
+
+This CLAUDE.md is the single source of truth for architecture, file locations, endpoints, models, and patterns. **Before searching the codebase, check if the answer is already documented here.** Subagents (explore, plan, etc.) should:
+
+1. Read CLAUDE.md first — it covers all key files, endpoints, models, services, and frontend components
+2. Only search the codebase for specifics not covered here (e.g., exact line numbers, implementation details within a function, recently added code)
+3. Never re-discover architecture that's already documented — go straight to the relevant files listed below
+
+This saves tokens, time, and keeps us shipping.
+
 ## How to Respond
 
 - Act as my CTO. Push back when necessary. Do not be a people pleaser. Make sure we succeed.
@@ -288,14 +298,14 @@ The backend follows a service-oriented architecture:
 - `ConfirmModal.jsx` - Reusable confirmation dialog (e.g. delete plan, end block); replaces `window.confirm`.
 - `StravaImport.jsx` - Strava OAuth and activity data display (disabled by default).
 - `WorkoutCard.jsx` - High-contrast "sporty" component for workout details, showing Planned vs. Actual metrics.
-- `WorkoutEditModal.jsx` - Mobile-optimized bottom-sheet for editing workout details.
-- `ProfilePage.jsx` - Profile tab: read-only account info (name/email from Google), editable training preferences (available days, experience level, weekly mileage), sign-out button.
+- `WorkoutEditModal.jsx` - Mobile-optimized bottom-sheet for editing workout details. Supports delete (via ConfirmModal) and unit-aware distance input (mi/km conversion).
+- `ProfilePage.jsx` - Profile tab: read-only account info (name/email from Google), editable training preferences (available days, experience level, weekly mileage, distance unit), sign-out button.
 - `GoogleLoginPage.jsx` - Google OAuth login with invite code flow for new users.
 - `InviteCodeModal.jsx` - Invite code entry + consent checkbox for new user signup.
 - **Deleted**: `ChatInterface.jsx`, `WeekAheadView.jsx`, `MonthView.jsx`, `PlanManager/`, `LoginPage.jsx` (replaced by GoalSetup, WeekView, BlockOverview, GoogleLoginPage).
 
 **Utilities**:
-- `workoutMapper.js` - Maps API workout data to display format. Exports `WORKOUT_TYPES` (single source of truth for type values/labels), `formatWorkoutType()`, `mapWorkoutToDesign()`, distance/duration formatters
+- `workoutMapper.js` - Maps API workout data to display format. Exports `WORKOUT_TYPES` (single source of truth for type values/labels), `formatWorkoutType()`, `mapWorkoutToDesign(workout, unit)`, `formatDistance(km, unit)`, `kmToMi()`, `miToKm()`, distance/duration formatters
 - `dateUtils.js` - `parseLocalDate(dateStr)` for safe YYYY-MM-DD → local Date parsing; `formatDate()` for display
 - `phaseCalculator.js` - `calculatePhaseMap(totalWeeks)`, `adjustPhaseMap()`, `calculateTotalWeeks(targetDate, startDate?)`, `PHASE_INFO` constants
 
@@ -305,7 +315,7 @@ The backend follows a service-oriented architecture:
 
 **User Profile & Preferences**:
 - `GET /api/user/profile` - Returns authenticated user's profile + preferences
-- `PUT /api/user/preferences` - Update preferences: `available_days` (list of mon-sun), `experience_level` (beginner/intermediate/advanced), `weekly_mileage_comfort` (number)
+- `PUT /api/user/preferences` - Update preferences: `available_days` (list of mon-sun), `experience_level` (beginner/intermediate/advanced), `weekly_mileage_comfort` (number or null), `distance_unit` (`'mi'` or `'km'`, default `'mi'`)
 
 **Workout Plans**:
 - `POST /api/chat` - Generate new workout plan from chat message
@@ -500,7 +510,7 @@ The `LLMService` abstracts provider differences:
 - `name` (String(255), nullable)
 - `google_id` (String(255), unique, indexed) - Google OAuth sub ID
 - `role` (Enum: super_admin/admin/beta_tester)
-- `preferences` (JSONB, nullable) - `{ available_days, experience_level, weekly_mileage_comfort }`
+- `preferences` (JSONB, nullable) - `{ available_days, experience_level, weekly_mileage_comfort, distance_unit }`
 - `settings` (JSONB, nullable)
 - `invite_code_used` (String(50), nullable)
 - `created_at`, `updated_at` (DateTime)

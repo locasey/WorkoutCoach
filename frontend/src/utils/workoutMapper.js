@@ -34,14 +34,22 @@ export function getWorkoutStatus(workout) {
   return workout.is_completed ? 'completed' : 'pending';
 }
 
+const KM_TO_MI = 0.621371
+const MI_TO_KM = 1.60934
+
+export function kmToMi(km) { return +(km * KM_TO_MI).toFixed(2) }
+export function miToKm(mi) { return +(mi * MI_TO_KM).toFixed(2) }
+
 /**
  * Format distance for display
- * @param {number|null} distanceKm - Distance in kilometers
- * @returns {string} Formatted distance (e.g., "5km")
+ * @param {number|null} distanceKm - Distance in kilometers (DB unit)
+ * @param {string} unit - Display unit: 'mi' (default) or 'km'
+ * @returns {string} Formatted distance (e.g., "3.11 mi" or "5 km")
  */
-export function formatDistance(distanceKm) {
+export function formatDistance(distanceKm, unit = 'mi') {
   if (!distanceKm) return '';
-  return `${distanceKm}km`;
+  if (unit === 'mi') return `${kmToMi(distanceKm)} mi`;
+  return `${distanceKm} km`;
 }
 
 /**
@@ -142,9 +150,10 @@ export function getDayNameFromNumber(day) {
 /**
  * Map database workout to design interface format
  * @param {Object} dbWorkout - Workout from database API
+ * @param {string} [unit='mi'] - Display unit for distances
  * @returns {Object} Workout in design format
  */
-export function mapWorkoutToDesign(dbWorkout) {
+export function mapWorkoutToDesign(dbWorkout, unit = 'mi') {
   const status = getWorkoutStatus(dbWorkout);
   
   // Try to get day name from scheduled_date first, fall back to day number
@@ -159,7 +168,7 @@ export function mapWorkoutToDesign(dbWorkout) {
     id: dbWorkout.id,
     day: dayName,
     type: formatWorkoutType(dbWorkout.type),
-    distance: formatDistance(dbWorkout.distance_km),
+    distance: formatDistance(dbWorkout.distance_km, unit),
     status: status,
     duration: formatDuration(dbWorkout.duration_minutes),
     pace: dbWorkout.pace || '',

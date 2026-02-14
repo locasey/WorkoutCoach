@@ -94,6 +94,18 @@ function App() {
   })
   const hasActiveBlock = !!blockData?.block
 
+  // Query user profile for preferences (distance unit)
+  const { data: profileData } = useQuery({
+    queryKey: queryKeys.user.profile,
+    queryFn: async () => {
+      const response = await axios.get(API_ROUTES.USER.PROFILE)
+      return response.data
+    },
+    staleTime: 60 * 1000,
+    enabled: isAuthenticated,
+  })
+  const distanceUnit = profileData?.user?.preferences?.distance_unit || 'mi'
+
   /**
    * Coach tab: state-aware behavior
    * - No active block -> open GoalSetup
@@ -220,6 +232,7 @@ function App() {
               onStartTraining={() => setShowGoalSetup(true)}
               showRegenerate={showRegenerate}
               setShowRegenerate={setShowRegenerate}
+              unit={distanceUnit}
             />
           )}
           {activeTab === 'plans' && (

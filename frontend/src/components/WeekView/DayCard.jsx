@@ -61,6 +61,7 @@ export function DayCard({
   onAddWorkout,
   canAddWorkout = true,
   targetDate,
+  unit = 'mi',
 }) {
   const { dayName, dayNumber } = formatDayDisplay(date)
   const isTodayDate = isToday(date)
@@ -75,7 +76,7 @@ export function DayCard({
    */
   const mapWorkout = (workout) => {
     if (workout._original) return workout
-    return mapWorkoutToDesign(workout)
+    return mapWorkoutToDesign(workout, unit)
   }
 
   return (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { LogOut } from 'lucide-react'
 import { API_ROUTES } from '../api/routes'
@@ -24,11 +24,13 @@ const EXPERIENCE_LEVELS = [
 ]
 
 export default function ProfilePage({ onLogout }) {
-  const { showToast } = useToast()
+  const queryClient = useQueryClient()
+  const toast = useToast()
 
   const [availableDays, setAvailableDays] = useState([])
   const [experienceLevel, setExperienceLevel] = useState('beginner')
   const [weeklyMileage, setWeeklyMileage] = useState('')
+  const [distanceUnit, setDistanceUnit] = useState('mi')
 
   // Fetch user profile (includes preferences)
   const { data: profileData, isLoading } = useQuery({
@@ -48,6 +50,7 @@ export default function ProfilePage({ onLogout }) {
       setWeeklyMileage(
         prefs.weekly_mileage_comfort != null ? String(prefs.weekly_mileage_comfort) : ''
       )
+      setDistanceUnit(prefs.distance_unit || 'mi')
     }
   }, [profileData])
 
@@ -58,12 +61,13 @@ export default function ProfilePage({ onLogout }) {
       return response.data
     },
     onSuccess: () => {
-      showToast('Preferences saved', 'success')
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.profile })
+      toast.success('Preferences saved')
     },
     onError: (err) => {
       const message =
         err?.response?.data?.error || 'Failed to save preferences'
-      showToast(message, 'error')
+      toast.error(message)
     },
   })
 
@@ -81,6 +85,7 @@ export default function ProfilePage({ onLogout }) {
       experience_level: experienceLevel,
       weekly_mileage_comfort:
         weeklyMileage !== '' ? parseFloat(weeklyMileage) : null,
+      distance_unit: distanceUnit,
     })
   }
 
@@ -156,10 +161,26 @@ export default function ProfilePage({ onLogout }) {
           </select>
         </div>
 
+        {/* Distance unit */}
+        <div className="profile-page__field profile-page__field--stacked">
+          <label className="profile-page__label" htmlFor="distance-unit">
+            Distance Unit
+          </label>
+          <select
+            id="distance-unit"
+            className="profile-page__select"
+            value={distanceUnit}
+            onChange={(e) => setDistanceUnit(e.target.value)}
+          >
+            <option value="mi">Miles</option>
+            <option value="km">Kilometers</option>
+          </select>
+        </div>
+
         {/* Weekly mileage */}
         <div className="profile-page__field profile-page__field--stacked">
           <label className="profile-page__label" htmlFor="weekly-mileage">
-            Weekly Mileage Comfort (km)
+            Weekly Mileage Comfort ({distanceUnit === 'km' ? 'km' : 'mi'})
           </label>
           <input
             id="weekly-mileage"

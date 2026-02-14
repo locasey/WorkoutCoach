@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { X, Save, AlertCircle, Check, Trash2 } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
 import { useToast } from './Toast';
 import { WORKOUT_TYPES } from '../utils/workoutMapper';
+import { kmToMi, miToKm } from '../utils/workoutMapper';
 import './WorkoutEditModal.css';
 
 const API_BASE_URL = '/api';
 
-export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
+export function WorkoutEditModal({ workout, isOpen, onClose, onSave, onDelete, unit = 'mi' }) {
   const [formData, setFormData] = useState({
     type: '',
-    distance_km: '',
+    distance: '',
     duration_minutes: '',
     pace: '',
     notes: ''
@@ -19,37 +21,45 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
   const [error, setError] = useState(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const toast = useToast();
 
   // Initialize form data when workout changes
   useEffect(() => {
     if (workout?._original) {
       const original = workout._original;
+      const displayDistance = original.distance_km != null && original.distance_km !== ''
+        ? (unit === 'mi' ? kmToMi(original.distance_km) : original.distance_km)
+        : '';
       setFormData({
         type: original.type || '',
-        distance_km: original.distance_km ?? '',
+        distance: displayDistance,
         duration_minutes: original.duration_minutes ?? '',
         pace: original.pace || '',
         notes: original.notes || ''
       });
       setHasChanges(false);
       setError(null);
+      setShowDeleteConfirm(false);
     }
-  }, [workout]);
+  }, [workout, unit]);
 
   // Track changes
   useEffect(() => {
     if (workout?._original) {
       const original = workout._original;
+      const originalDisplayDist = original.distance_km != null && original.distance_km !== ''
+        ? (unit === 'mi' ? kmToMi(original.distance_km) : original.distance_km)
+        : '';
       const changed =
         formData.type !== (original.type || '') ||
-        formData.distance_km !== (original.distance_km ?? '') ||
+        formData.distance !== originalDisplayDist ||
         formData.duration_minutes !== (original.duration_minutes ?? '') ||
         formData.pace !== (original.pace || '') ||
         formData.notes !== (original.notes || '');
       setHasChanges(changed);
     }
-  }, [formData, workout]);
+  }, [formData, workout, unit]);
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -83,8 +93,8 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
     }
 
     // Validate distance
-    if (formData.distance_km !== '' && formData.distance_km !== null) {
-      const distance = parseFloat(formData.distance_km);
+    if (formData.distance !== '' && formData.distance !== null) {
+      const distance = parseFloat(formData.distance);
       if (isNaN(distance) || distance < 0) {
         errors.push('Distance must be a non-negative number');
       }
@@ -122,8 +132,16 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
       if (formData.type !== original.type) {
         updateData.type = formData.type;
       }
-      if (formData.distance_km !== (original.distance_km ?? '')) {
-        updateData.distance_km = formData.distance_km === '' ? null : parseFloat(formData.distance_km);
+      const originalDisplayDist = original.distance_km != null && original.distance_km !== ''
+        ? (unit === 'mi' ? kmToMi(original.distance_km) : original.distance_km)
+        : '';
+      if (formData.distance !== originalDisplayDist) {
+        if (formData.distance === '' || formData.distance === null) {
+          updateData.distance_km = null;
+        } else {
+          const val = parseFloat(formData.distance);
+          updateData.distance_km = unit === 'mi' ? miToKm(val) : val;
+        }
       }
       if (formData.duration_minutes !== (original.duration_minutes ?? '')) {
         updateData.duration_minutes = formData.duration_minutes === '' ? null : parseInt(formData.duration_minutes);
@@ -224,13 +242,13 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
                 />
               </div>
               <div className="form-group flex-1">
-                <label className="form-label">Distance (km)</label>
+                <label className="form-label">Distance ({unit === 'km' ? 'km' : 'mi'})</label>
                 <input
                   type="number"
-                  name="distance_km"
-                  value={formData.distance_km}
+                  name="distance"
+                  value={formData.distance}
                   onChange={handleInputChange}
-                  placeholder="10"
+                  placeholder={unit === 'km' ? '10' : '6.2'}
                   step="0.1"
                   className="form-input"
                 />
@@ -264,15 +282,26 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
         </div>
 
         <div className="modal-footer">
-          <button 
-            type="button" 
-            onClick={handleClose} 
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="btn-modal"
+              style={{ color: '#dc2626', borderColor: '#dc2626', marginRight: 'auto' }}
+            >
+              <Trash2 className="w-4 h-4" style={{ marginRight: 4, display: 'inline' }} />
+              Delete
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleClose}
             className="btn-modal btn-modal-secondary"
           >
             Cancel
           </button>
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             form="edit-workout-form"
             className="btn-modal btn-modal-primary"
             disabled={loading || !hasChanges}
@@ -281,6 +310,20 @@ export function WorkoutEditModal({ workout, isOpen, onClose, onSave }) {
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        variant="danger"
+        title="Delete Workout"
+        message="This workout will be permanently removed."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          onDelete(workout.id);
+          setShowDeleteConfirm(false);
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </>
   );
 }

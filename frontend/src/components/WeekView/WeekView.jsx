@@ -32,7 +32,7 @@ import { useToast } from '../Toast'
 
 import { queryKeys } from '../../api/queryClient'
 import { API_ROUTES, buildUrl } from '../../api/routes'
-import { mapWorkoutToDesign, formatWorkoutType } from '../../utils/workoutMapper'
+import { mapWorkoutToDesign, formatWorkoutType, formatDistance } from '../../utils/workoutMapper'
 import { parseLocalDate } from '../../utils/dateUtils'
 
 import './WeekView.css'
@@ -102,6 +102,7 @@ export function WeekView({
   onStartTraining,
   showRegenerate: showRegenerateProp,
   setShowRegenerate: setShowRegenerateProp,
+  unit = 'mi',
 }) {
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -203,6 +204,25 @@ export function WeekView({
   })
 
   /**
+   * Delete workout mutation
+   */
+  const deleteWorkoutMutation = useMutation({
+    mutationFn: async (workoutId) => {
+      const response = await axios.delete(API_ROUTES.WORKOUTS.BY_ID(workoutId))
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.week.byOffset(weekOffset) })
+      setEditModalOpen(false)
+      setSelectedWorkout(null)
+      toast.success('Workout deleted')
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.error || 'Failed to delete workout')
+    },
+  })
+
+  /**
    * Handle week navigation
    */
   const handleWeekChange = useCallback(
@@ -220,7 +240,7 @@ export function WeekView({
     (workoutId) => {
       const workout = weekData?.workouts?.find((w) => w.id === workoutId)
       if (workout) {
-        setSelectedWorkout(mapWorkoutToDesign(workout))
+        setSelectedWorkout(mapWorkoutToDesign(workout, unit))
         setEditModalOpen(true)
       }
     },
@@ -245,6 +265,16 @@ export function WeekView({
       addWorkoutMutation.mutate({ scheduledDate: date })
     },
     [addWorkoutMutation]
+  )
+
+  /**
+   * Handle delete workout
+   */
+  const handleDeleteWorkout = useCallback(
+    (workoutId) => {
+      deleteWorkoutMutation.mutate(workoutId)
+    },
+    [deleteWorkoutMutation]
   )
 
   /**
@@ -385,7 +415,7 @@ export function WeekView({
                 ? '🏁'
                 : dayWorkouts.length > 0
                   ? dayWorkouts[0].distance_km
-                    ? `${dayWorkouts[0].distance_km}km`
+                    ? formatDistance(dayWorkouts[0].distance_km, unit)
                     : dayWorkouts[0].duration_minutes
                       ? `${dayWorkouts[0].duration_minutes}m`
                       : formatWorkoutType(dayWorkouts[0].type) || 'Rest'
@@ -417,6 +447,7 @@ export function WeekView({
                 onAddWorkout={handleAddWorkoutToDay}
                 canAddWorkout={weekData?.block_id != null}
                 targetDate={weekData?.target_date}
+                unit={unit}
               />
             </section>
           )}
@@ -434,6 +465,7 @@ export function WeekView({
               onAddWorkout={handleAddWorkoutToDay}
               canAddWorkout={weekData?.block_id != null}
               targetDate={weekData?.target_date}
+              unit={unit}
             />
           ))}
         </section>
@@ -471,6 +503,8 @@ export function WeekView({
         }}
         workout={selectedWorkout}
         onSave={handleSaveWorkout}
+        onDelete={handleDeleteWorkout}
+        unit={unit}
       />
     </div>
   )

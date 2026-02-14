@@ -7,9 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Workout Delete**: Delete button (red, with Trash2 icon) in WorkoutEditModal footer; opens ConfirmModal with danger variant before deleting
+- **Miles by Default**: All distances now display in miles by default; users can switch to km via Profile preferences
+  - `kmToMi()`, `miToKm()`, `formatDistance(km, unit)` utilities in `workoutMapper.js`
+  - `distance_unit` preference (`'mi'` | `'km'`) stored in user JSONB preferences; validated in `UserService`
+  - Distance unit toggle in ProfilePage (Miles / Kilometers dropdown)
+  - WorkoutEditModal converts display ↔ storage units on load/save
+  - Mobile day-pills and WorkoutCards respect user's unit preference
+  - `App.jsx` queries profile, threads `unit` prop → WeekView → DayCard → WorkoutCard
+
 ### Changed
 - **Login page**: Full-page centered card layout with proper styling; added divider + "Sign in to get started" CTA above Google button
 - **Deploy workflow**: Added `GOOGLE_CLIENT_ID` to frontend build env and backend container env
+- `ProfilePage.jsx`: Fixed toast API usage (`showToast` → `toast.success`/`toast.error`); save now invalidates profile query cache
+- `ConfirmModal.css`: z-index bumped from 2000 → 2100 so it layers above WorkoutEditModal
+- `WeekView.jsx`: Added `deleteWorkoutMutation`, `unit` prop passed to DayCard, mobile day-pills, and WorkoutEditModal
+- Weekly Mileage Comfort label now reflects selected distance unit ("mi" or "km")
 
 ### Fixed
 - **Auth bypass**: `App.jsx` destructured `auth_enabled` from `/api/auth/check` but backend never returns it — `undefined` caused all users to skip login. Now uses `authenticated` directly.

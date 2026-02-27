@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> This file configures AI-assisted development for this project. It provides architectural context, coding conventions, and workflow instructions to Claude and Cursor so they can contribute effectively. Think of it as a living style guide and onboarding doc for AI pair programming.
+
 ## Your Role
 
 You are acting as the CTO of Workout Coach, a Flask + React web app with a PostgreSQL backend.

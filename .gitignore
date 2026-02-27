@@ -50,5 +50,8 @@ logs/
 # Claude Code temp files
 tmpclaude-*
 
-#Docs 
+# Docs
 docs/archived/
+
+# Design prototypes
+design/

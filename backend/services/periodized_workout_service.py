@@ -36,7 +36,8 @@ class PeriodizedWorkoutService:
         block_id: uuid.UUID,
         experience_level: str = "intermediate",
         llm_service: LLMService = None,
-        user_id: uuid.UUID = None
+        user_id: uuid.UUID = None,
+        user_role: str = None
     ) -> Dict[str, Any]:
         """
         Generate all workouts for a training block, phase by phase.
@@ -87,7 +88,8 @@ class PeriodizedWorkoutService:
                     phase_focus=phase_focus,
                     week_numbers=week_numbers,
                     total_weeks=block.total_weeks,
-                    experience_level=experience_level
+                    experience_level=experience_level,
+                    user_role=user_role
                 )
             except Exception as e:
                 # If a phase fails, commit what we have so far and report

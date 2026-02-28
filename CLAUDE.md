@@ -100,7 +100,7 @@ If not — it waits.
 
 - **Frontend**: Vite, React
 - **Backend**: Flask (Python), PostgreSQL, SQLAlchemy ORM
-- **LLM Integration**: Gemini / OpenAI
+- **LLM Integration**: Gemini / OpenAI / Anthropic (Claude)
 - **External APIs**: Strava OAuth
 - **Migrations**: Alembic
 
@@ -173,7 +173,7 @@ See `docs/ARCHITECTURE_ROADMAP.md` for the full execution plan. Key changes:
 
 ## Project Overview
 
-Workout Coach is a web application that generates personalized workout plans powered by LLMs (Gemini or OpenAI). The application uses a PostgreSQL database to persist training blocks and individual workouts.
+Workout Coach is a web application that generates personalized workout plans powered by LLMs (Gemini, Anthropic Claude, or OpenAI — tier-routed by user role). The application uses a PostgreSQL database to persist training blocks and individual workouts.
 
 **Note:** Strava integration is disabled and preserved for future use. The app focuses on planning, not tracking.
 
@@ -268,7 +268,7 @@ The backend follows a service-oriented architecture:
 - One-to-many relationship: WorkoutPlan → Workouts (with cascade delete)
 
 **Services** (`backend/services/`):
-- `llm_service.py` - Abstracts LLM providers (Gemini/OpenAI), generates structured workout plans from chat messages + `generate_periodized_workouts()` for phase-specific generation
+- `llm_service.py` - Multi-provider LLM abstraction (Gemini / OpenAI / Anthropic). All providers with configured API keys are initialized at startup. `MODEL_TIERS` maps user role → model per provider; `_dispatch()` routes each call to the correct provider API based on model ID. `generate_workout_plan()` and `generate_periodized_workouts()` accept `user_role` to select the appropriate model. `get_models_for_role(user_role)` returns the full catalog with `available` flags for the UI model selector.
 - `workout_plan_service.py` - Business logic for workout CRUD, plan activation, week/month queries, progress tracking. Key methods accept `user_id` for data isolation.
 - `training_block_service.py` - TrainingBlock CRUD, week context calculation, block overview with phase status, `regenerate_week()` (snapshot + delete + LLM regen for a single week). `get_block_by_id()` accepts `user_id`.
 - `periodized_workout_service.py` - Orchestrates phase-by-phase LLM workout generation for training blocks
@@ -363,14 +363,16 @@ The backend follows a service-oriented architecture:
 Create `backend/.env` with:
 
 ```env
-# LLM Provider (default: gemini)
+# LLM Provider — sets the default provider for tier-based model routing
+# Options: gemini | openai | anthropic (default: gemini)
 LLM_PROVIDER=gemini
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash-lite  # Optional, defaults to gemini-2.5-flash-lite
 
-# Alternative: OpenAI
-# LLM_PROVIDER=openai
-# OPENAI_API_KEY=your_openai_api_key_here
+# Add keys for every provider you want available (at minimum, the primary one above)
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.5-flash-lite  # Optional override; normally set by user role tier
+
+OPENAI_API_KEY=your_openai_api_key_here      # Optional — enables OpenAI models
+ANTHROPIC_API_KEY=your_anthropic_api_key_here  # Optional — enables Claude models
 
 # Strava OAuth
 STRAVA_CLIENT_ID=your_strava_client_id
@@ -440,10 +442,18 @@ const date = parseLocalDate('2026-02-02')  // Local midnight
 
 ### LLM Integration
 
-The `LLMService` abstracts provider differences:
-- Supports both Gemini and OpenAI (provider selected via `LLM_PROVIDER` env var)
-- Returns structured workout plan JSON with weeks, days, types, durations, distances
-- Handles JSON parsing and error recovery from LLM responses
+`LLMService` supports Gemini, OpenAI, and Anthropic simultaneously:
+- **Provider init**: All providers with API keys in `.env` are initialized at startup. `LLM_PROVIDER` sets the primary (default) provider.
+- **Tier routing**: `MODEL_TIERS` maps `{ role → { provider → model_id } }`. User role is passed from `g.current_user.role` at every LLM call site in `app.py` and threaded to `llm_service`.
+- **Dispatch**: `_dispatch(prompt, model_id)` routes to `_generate_with_gemini/openai/anthropic` based on `MODEL_PROVIDER_MAP`.
+- **Model catalog**: `GET /api/llm/models` returns all 8 models across providers with `available: bool` for the caller's role — used by the frontend model selector (LOC-42).
+- **Tier map** (primary provider is Gemini by default):
+
+| Role | Gemini | Anthropic | OpenAI |
+|------|--------|-----------|--------|
+| `super_admin` | gemini-2.5-pro | claude-opus-4-6 | gpt-4o |
+| `admin` | gemini-2.5-flash | claude-sonnet-4-6 | gpt-4o |
+| `beta_tester` | gemini-2.5-flash-lite | claude-haiku-4-5-20251001 | gpt-4o-mini |
 
 ### Strava OAuth Flow
 

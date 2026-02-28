@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Tier-based model routing** — LLM model selected by user role at call time. `super_admin` gets frontier models (Gemini 2.5 Pro / Claude Opus 4.6 / GPT-4o), `beta_tester` stays on lite defaults.
+- **Anthropic Claude support** — `_generate_with_anthropic()` added; `anthropic>=0.40.0` in requirements. Set `ANTHROPIC_API_KEY` to enable.
+- **Multi-provider init** — All three providers (Gemini, OpenAI, Anthropic) initialize at startup if their API keys are present. No-op if key absent; only the primary provider must be configured.
+- **`GET /api/llm/models`** — Returns full model catalog across all providers with `available: bool` per model based on caller's role. Response includes `active_model` and `primary_provider`.
+- **`MODEL_TIERS`, `ALL_MODELS`, `MODEL_PROVIDER_MAP`** constants in `llm_service.py` — single source of truth for model catalog and tier assignments.
+
+### Changed
+- `LLMService._dispatch()` now routes each LLM call to the correct provider API based on model ID, not the global `LLM_PROVIDER` env var. Provider env var still sets the default tier model.
+- `generate_periodized_workouts()` and `generate_workout_plan()` accept `user_role=None`; defaults to `beta_tester` tier (backward-compatible).
+- `PeriodizedWorkoutService.generate_workouts_for_block()` and `TrainingBlockService.regenerate_week()` accept `user_role=None` and thread it to LLM calls.
+
+---
+
 ## Key Milestones
 
 ### Multi-User Auth & Profiles (Phase 6)

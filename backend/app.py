@@ -295,6 +295,25 @@ def list_invite_codes():
 
 
 # ============================================================================
+# LLM Model Catalog
+# ============================================================================
+
+@app.route('/api/llm/models', methods=['GET'])
+@require_auth
+def get_llm_models():
+    """Return all available models with availability flag for the current user's role."""
+    from services.llm_service import LLMService
+    user_role = str(g.current_user.role)
+    models = LLMService.get_models_for_role(user_role)  # all providers
+    return jsonify({
+        "models": models,
+        "active_model": llm_service.get_active_model_name(user_role),
+        "primary_provider": llm_service.provider,
+        "user_role": user_role
+    })
+
+
+# ============================================================================
 # User Profile & Preferences
 # ============================================================================
 
@@ -363,7 +382,7 @@ def chat():
                 }), 400
 
             # Generate workout plan using LLM
-            workout_plan_data = llm_service.generate_workout_plan(user_message)
+            workout_plan_data = llm_service.generate_workout_plan(user_message, user_role=str(g.current_user.role))
 
             # Save to database
             workout_plan = WorkoutPlanService.create_workout_plan(
@@ -811,7 +830,8 @@ def generate_block_workouts(block_id):
                 block_id=block_uuid,
                 experience_level=experience_level,
                 llm_service=llm_service,
-                user_id=g.current_user_id
+                user_id=g.current_user_id,
+                user_role=str(g.current_user.role)
             )
             logger.info(f"Generated {result['workouts_created']} workouts for block {block_id}")
             return jsonify(result)
@@ -850,7 +870,8 @@ def regenerate_week():
                 week_offset=week_offset,
                 reason=reason,
                 llm_service=llm_service,
-                user_id=g.current_user_id
+                user_id=g.current_user_id,
+                user_role=str(g.current_user.role)
             )
             logger.info(f"Regenerated week (offset={week_offset}) for block {block.id}")
             return jsonify(result)

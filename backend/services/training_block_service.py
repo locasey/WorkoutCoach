@@ -309,7 +309,8 @@ class TrainingBlockService:
         week_offset: int,
         reason: str,
         llm_service,
-        user_id: uuid.UUID
+        user_id: uuid.UUID,
+        user_role: str = None
     ) -> Dict[str, Any]:
         """
         Regenerate workouts for a specific week of a training block.
@@ -413,7 +414,8 @@ class TrainingBlockService:
             phase_focus=phase_focus,
             week_numbers=[week_number],
             total_weeks=block.total_weeks,
-            experience_level="intermediate"
+            experience_level="intermediate",
+            user_role=user_role
         )
 
         # Insert new workouts

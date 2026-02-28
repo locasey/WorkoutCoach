@@ -93,21 +93,19 @@ jobs:
       # ----------------------------------------------------------------------
       # Build Docker Image
       # ----------------------------------------------------------------------
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Build backend Docker image
         run: |
           cd backend
-          docker build -t workout-coach-backend:latest .
+          docker build --load -t workout-coach-backend:latest .
 
       # ----------------------------------------------------------------------
       # Push to Lightsail
       # ----------------------------------------------------------------------
       - name: Install Lightsail CLI plugin
         run: |
-          curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "/usr/local/bin/lightsailctl"
+          sudo curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "/usr/local/bin/lightsailctl"
           sudo chmod +x /usr/local/bin/lightsailctl
+          lightsailctl --version || echo "Version check skipped"
 
       - name: Push image to Lightsail
         id: push-image
@@ -123,6 +121,11 @@ jobs:
 
           # Extract the image name (format: :service-name.label.X)
           IMAGE_NAME=$(echo "$OUTPUT" | grep -oP ':\S+\.\d+' | head -1)
+          if [ -z "$IMAGE_NAME" ]; then
+            echo "ERROR: Could not extract image name from push output"
+            echo "Full output was: $OUTPUT"
+            exit 1
+          fi
           echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
           echo "Pushed image: $IMAGE_NAME"
 

@@ -4,7 +4,7 @@ A personalized training plan generator that uses LLMs to create periodized runni
 
 ## The Problem
 
-Most runners either follow generic training plans that ignore their schedule and fitness level, or pay for a human coach. I wanted something in between — a tool that generates structured, periodized weekly plans (base, build, peak, taper) and lets you adjust on the fly without losing the overall structure. It's an ongoing project — I'm actively iterating on prompt engineering and plan quality to get workouts that feel like they came from a real coach.
+Most runners either follow generic training plans that ignore their schedule and fitness level, or pay for a human coach. I wanted something in between — a tool that generates structured, periodized weekly plans (base, build, peak, taper) and lets you adjust on the fly without losing the overall structure. It's an ongoing project — I'm actively iterating on prompt engineering and plan quality to get workouts that feel like they came from a real coach (not an LLM).
 
 ## How It Works
 

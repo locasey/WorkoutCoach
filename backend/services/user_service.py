@@ -111,12 +111,20 @@ class UserService:
             if preferences['distance_unit'] not in UserService.VALID_DISTANCE_UNITS:
                 errors['distance_unit'] = f"Must be one of: {', '.join(sorted(UserService.VALID_DISTANCE_UNITS))}"
 
+        if 'preferred_model' in preferences:
+            model_id = preferences['preferred_model']
+            if model_id is not None:
+                from services.llm_service import ALL_MODELS
+                valid_model_ids = {m['id'] for m in ALL_MODELS}
+                if model_id not in valid_model_ids:
+                    errors['preferred_model'] = f"Invalid model ID: {model_id}"
+
         if errors:
             raise ValueError(f"Validation errors: {'; '.join(f'{k}: {v}' for k, v in errors.items())}")
 
         # Merge into existing preferences
         current = dict(user.preferences) if user.preferences else {}
-        allowed_keys = {'available_days', 'experience_level', 'weekly_mileage_comfort', 'distance_unit'}
+        allowed_keys = {'available_days', 'experience_level', 'weekly_mileage_comfort', 'distance_unit', 'preferred_model'}
         for key in allowed_keys:
             if key in preferences:
                 current[key] = preferences[key]

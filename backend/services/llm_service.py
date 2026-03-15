@@ -111,9 +111,16 @@ class LLMService:
     # Tier / model helpers
     # ------------------------------------------------------------------
 
-    def _model_for_role(self, user_role: str) -> str:
-        """Return the model ID for the given role using the primary provider."""
+    def _model_for_role(self, user_role: str, preferred_model: str = None) -> str:
+        """Return the model ID for the given role, honoring preferred_model if accessible."""
         role = user_role if user_role in MODEL_TIERS else 'beta_tester'
+        if preferred_model:
+            model_entry = next((m for m in ALL_MODELS if m['id'] == preferred_model), None)
+            if model_entry:
+                user_rank = TIER_RANK.get(role, TIER_RANK['beta_tester'])
+                model_rank = TIER_RANK.get(model_entry['tier'], 1)
+                if user_rank >= model_rank and self._is_provider_available(model_entry['provider']):
+                    return preferred_model
         return MODEL_TIERS[role].get(self.provider, MODEL_TIERS['beta_tester'][self.provider])
 
     def get_active_model_name(self, user_role: str = None) -> str:
@@ -213,7 +220,7 @@ class LLMService:
     # Public generation methods
     # ------------------------------------------------------------------
 
-    def generate_workout_plan(self, user_request: str, user_role: str = None) -> dict:
+    def generate_workout_plan(self, user_request: str, user_role: str = None, preferred_model: str = None) -> dict:
         """Generate a structured workout plan. Returns a workout plan dict."""
         prompt = f"""You are an expert running coach. Create a detailed, structured workout plan based on this request: {user_request}
 
@@ -236,7 +243,7 @@ Please provide a workout plan in the following JSON format:
 
 Make the plan realistic, progressive, and tailored to the user's goal. Include proper rest days and build up gradually."""
 
-        model_id = self._model_for_role(user_role)
+        model_id = self._model_for_role(user_role, preferred_model)
         try:
             plan_json = self._dispatch(prompt, model_id)
             plan_json['created_at'] = datetime.now().isoformat()
@@ -255,7 +262,8 @@ Make the plan realistic, progressive, and tailored to the user's goal. Include p
         week_numbers: list,
         total_weeks: int,
         experience_level: str = "intermediate",
-        user_role: str = None
+        user_role: str = None,
+        preferred_model: str = None
     ) -> list:
         """
         Generate workouts for a single phase of a periodized training plan.
@@ -295,7 +303,7 @@ Rules:
 
 Return ONLY a JSON object: {{"workouts": [...]}}"""
 
-        model_id = self._model_for_role(user_role)
+        model_id = self._model_for_role(user_role, preferred_model)
         try:
             result = self._dispatch(prompt, model_id)
             if isinstance(result, dict) and "workouts" in result:

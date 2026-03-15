@@ -1,0 +1,115 @@
+/* ==========================================================================
+   ModelSelector — pill-based LLM model chooser
+   ========================================================================== */
+
+.model-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.model-selector__loading {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+}
+
+.model-selector__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.model-selector__provider-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gray-500);
+}
+
+.model-selector__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.model-selector__pill-wrap {
+  position: relative;
+}
+
+.model-selector__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: white;
+  color: var(--carbon-black);
+  border: 2px solid var(--gray-200);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-height: 44px; /* touch-friendly */
+  user-select: none;
+  white-space: nowrap;
+}
+
+.model-selector__pill:hover:not(:disabled) {
+  border-color: var(--persian-blue);
+  color: var(--persian-blue);
+}
+
+.model-selector__pill--active {
+  background: var(--carbon-black);
+  color: white;
+  border-color: var(--carbon-black);
+  box-shadow: 2px 2px 0px var(--carbon-black);
+}
+
+.model-selector__pill--active:hover:not(:disabled) {
+  background: var(--carbon-black);
+  color: white;
+  border-color: var(--carbon-black);
+}
+
+.model-selector__pill--locked {
+  color: var(--gray-400);
+  border-color: var(--gray-200);
+  background: var(--gray-100);
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.model-selector__lock-icon {
+  flex-shrink: 0;
+  color: var(--gray-400);
+}
+
+/* Tooltip */
+.model-selector__tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--carbon-black);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.model-selector__tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--carbon-black);
+}

@@ -5,6 +5,7 @@ import { LogOut } from 'lucide-react'
 import { API_ROUTES } from '../api/routes'
 import { queryKeys } from '../api/queryClient'
 import { useToast } from './Toast'
+import ModelSelector from './ModelSelector'
 import './ProfilePage.css'
 
 const DAYS = [
@@ -201,6 +202,15 @@ export default function ProfilePage({ onLogout }) {
         >
           {isSaving ? 'Saving...' : 'Save Preferences'}
         </button>
+      </section>
+
+      {/* AI Settings section */}
+      <section className="profile-page__section">
+        <h2 className="profile-page__section-title">AI Settings</h2>
+        <div className="profile-page__field profile-page__field--stacked">
+          <span className="profile-page__label">Coach Model</span>
+          <ModelSelector currentPreferredModel={profileData?.user?.preferences?.preferred_model} />
+        </div>
       </section>
 
       {/* Sign out */}

@@ -382,7 +382,8 @@ def chat():
                 }), 400
 
             # Generate workout plan using LLM
-            workout_plan_data = llm_service.generate_workout_plan(user_message, user_role=str(g.current_user.role))
+            preferred_model = (g.current_user.preferences or {}).get('preferred_model')
+            workout_plan_data = llm_service.generate_workout_plan(user_message, user_role=str(g.current_user.role), preferred_model=preferred_model)
 
             # Save to database
             workout_plan = WorkoutPlanService.create_workout_plan(
@@ -825,13 +826,15 @@ def generate_block_workouts(block_id):
         try:
             from services.periodized_workout_service import PeriodizedWorkoutService
             block_uuid = uuid.UUID(block_id)
+            preferred_model = (g.current_user.preferences or {}).get('preferred_model')
             result = PeriodizedWorkoutService.generate_workouts_for_block(
                 db=g.db,
                 block_id=block_uuid,
                 experience_level=experience_level,
                 llm_service=llm_service,
                 user_id=g.current_user_id,
-                user_role=str(g.current_user.role)
+                user_role=str(g.current_user.role),
+                preferred_model=preferred_model
             )
             logger.info(f"Generated {result['workouts_created']} workouts for block {block_id}")
             return jsonify(result)
@@ -864,6 +867,7 @@ def regenerate_week():
             if not block:
                 return jsonify({"error": "No active training block"}), 400
 
+            preferred_model = (g.current_user.preferences or {}).get('preferred_model')
             result = TrainingBlockService.regenerate_week(
                 db=g.db,
                 block_id=block.id,
@@ -871,7 +875,8 @@ def regenerate_week():
                 reason=reason,
                 llm_service=llm_service,
                 user_id=g.current_user_id,
-                user_role=str(g.current_user.role)
+                user_role=str(g.current_user.role),
+                preferred_model=preferred_model
             )
             logger.info(f"Regenerated week (offset={week_offset}) for block {block.id}")
             return jsonify(result)

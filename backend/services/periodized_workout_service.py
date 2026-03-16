@@ -38,7 +38,8 @@ class PeriodizedWorkoutService:
         llm_service: LLMService = None,
         user_id: uuid.UUID = None,
         user_role: str = None,
-        preferred_model: str = None
+        preferred_model: str = None,
+        user_preferences: dict = None
     ) -> Dict[str, Any]:
         """
         Generate all workouts for a training block, phase by phase.
@@ -72,6 +73,18 @@ class PeriodizedWorkoutService:
         if not llm_service:
             llm_service = LLMService()
 
+        # Derive experience_level from user_preferences if provided
+        prefs = user_preferences or {}
+        experience_level = prefs.get("experience_level", experience_level)
+
+        # Build context snapshot once (before phase loop) to inject into each LLM call
+        try:
+            from services.coach_context import build_context_snapshot, render_context_prompt
+            snapshot = build_context_snapshot(db, user_id, week_offset=0)
+            context_prompt = render_context_prompt(snapshot)
+        except Exception:
+            context_prompt = ""
+
         all_workouts = []
 
         # Generate workouts phase by phase
@@ -91,7 +104,8 @@ class PeriodizedWorkoutService:
                     total_weeks=block.total_weeks,
                     experience_level=experience_level,
                     user_role=user_role,
-                    preferred_model=preferred_model
+                    preferred_model=preferred_model,
+                    context_prompt=context_prompt
                 )
             except Exception as e:
                 # If a phase fails, commit what we have so far and report

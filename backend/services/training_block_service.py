@@ -311,7 +311,8 @@ class TrainingBlockService:
         llm_service,
         user_id: uuid.UUID,
         user_role: str = None,
-        preferred_model: str = None
+        preferred_model: str = None,
+        user_preferences: dict = None
     ) -> Dict[str, Any]:
         """
         Regenerate workouts for a specific week of a training block.
@@ -409,15 +410,26 @@ class TrainingBlockService:
 
         # Generate new workouts for this single week
         phase_focus = PeriodizedWorkoutService.PHASE_FOCUS.get(target_phase, "")
+        prefs = user_preferences or {}
+        experience_level = prefs.get("experience_level", "intermediate")
+
+        try:
+            from services.coach_context import build_context_snapshot, render_context_prompt
+            snapshot = build_context_snapshot(db, user_id, week_offset=week_offset)
+            context_prompt = render_context_prompt(snapshot)
+        except Exception:
+            context_prompt = ""
+
         new_workout_data = llm_service.generate_periodized_workouts(
             event_distance=block.event_distance,
             phase_name=target_phase,
             phase_focus=phase_focus,
             week_numbers=[week_number],
             total_weeks=block.total_weeks,
-            experience_level="intermediate",
+            experience_level=experience_level,
             user_role=user_role,
-            preferred_model=preferred_model
+            preferred_model=preferred_model,
+            context_prompt=context_prompt
         )
 
         # Insert new workouts

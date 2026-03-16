@@ -263,7 +263,8 @@ Make the plan realistic, progressive, and tailored to the user's goal. Include p
         total_weeks: int,
         experience_level: str = "intermediate",
         user_role: str = None,
-        preferred_model: str = None
+        preferred_model: str = None,
+        context_prompt: str = ""
     ) -> list:
         """
         Generate workouts for a single phase of a periodized training plan.
@@ -273,7 +274,8 @@ Make the plan realistic, progressive, and tailored to the user's goal. Include p
         weeks_str = ", ".join(str(w) for w in week_numbers)
         num_weeks = len(week_numbers)
 
-        prompt = f"""You are an expert running coach creating a periodized {event_distance} training plan.
+        context_block = context_prompt.strip() + "\n\n" if context_prompt.strip() else ""
+        prompt = context_block + f"""You are an expert running coach creating a periodized {event_distance} training plan.
 
 This is the **{phase_name}** phase (weeks {weeks_str} of {total_weeks} total weeks).
 Runner experience level: {experience_level}

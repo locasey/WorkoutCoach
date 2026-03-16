@@ -301,7 +301,8 @@ The backend follows a service-oriented architecture:
 - `StravaImport.jsx` - Strava OAuth and activity data display (disabled by default).
 - `WorkoutCard.jsx` - High-contrast "sporty" component for workout details, showing Planned vs. Actual metrics.
 - `WorkoutEditModal.jsx` - Mobile-optimized bottom-sheet for editing workout details. Supports delete (via ConfirmModal) and unit-aware distance input (mi/km conversion).
-- `ProfilePage.jsx` - Profile tab: read-only account info (name/email from Google), editable training preferences (available days, experience level, weekly mileage, distance unit), sign-out button.
+- `ProfilePage.jsx` - Profile tab: read-only account info (name/email from Google), editable training preferences (available days, experience level, weekly mileage, distance unit), AI Settings section with model selector, sign-out button.
+- `ModelSelector.jsx` - Pill-based LLM model chooser grouped by provider (Google/Anthropic/OpenAI). Available models are selectable and persist via `PUT /api/user/preferences`; locked models (higher tier) show a lock icon + "Available on Premium plan" tooltip. Touch-friendly.
 - `GoogleLoginPage.jsx` - Google OAuth login with invite code flow for new users.
 - `InviteCodeModal.jsx` - Invite code entry + consent checkbox for new user signup.
 - **Deleted**: `ChatInterface.jsx`, `WeekAheadView.jsx`, `MonthView.jsx`, `PlanManager/`, `LoginPage.jsx` (replaced by GoalSetup, WeekView, BlockOverview, GoogleLoginPage).
@@ -317,7 +318,7 @@ The backend follows a service-oriented architecture:
 
 **User Profile & Preferences**:
 - `GET /api/user/profile` - Returns authenticated user's profile + preferences
-- `PUT /api/user/preferences` - Update preferences: `available_days` (list of mon-sun), `experience_level` (beginner/intermediate/advanced), `weekly_mileage_comfort` (number or null), `distance_unit` (`'mi'` or `'km'`, default `'mi'`)
+- `PUT /api/user/preferences` - Update preferences: `available_days` (list of mon-sun), `experience_level` (beginner/intermediate/advanced), `weekly_mileage_comfort` (number or null), `distance_unit` (`'mi'` or `'km'`, default `'mi'`), `preferred_model` (model ID string or null — validated against `ALL_MODELS` catalog; tier access enforced at dispatch time)
 
 **Workout Plans**:
 - `POST /api/chat` - Generate new workout plan from chat message
@@ -522,7 +523,7 @@ const date = parseLocalDate('2026-02-02')  // Local midnight
 - `name` (String(255), nullable)
 - `google_id` (String(255), unique, indexed) - Google OAuth sub ID
 - `role` (Enum: super_admin/admin/beta_tester)
-- `preferences` (JSONB, nullable) - `{ available_days, experience_level, weekly_mileage_comfort, distance_unit }`
+- `preferences` (JSONB, nullable) - `{ available_days, experience_level, weekly_mileage_comfort, distance_unit, preferred_model }`
 - `settings` (JSONB, nullable)
 - `invite_code_used` (String(50), nullable)
 - `created_at`, `updated_at` (DateTime)

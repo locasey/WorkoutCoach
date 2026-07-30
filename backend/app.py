@@ -58,7 +58,7 @@ def close_db_session(exception=None):
 # Initialize services
 llm_service = LLMService()
 excel_service = ExcelService()
-strava_service = StravaService()
+strava_service = StravaService() if STRAVA_ENABLED else None
 
 # Initialize database on startup
 with app.app_context():

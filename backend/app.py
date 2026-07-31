@@ -853,7 +853,7 @@ def generate_block_workouts(block_id):
 @app.route('/api/week/regenerate', methods=['POST'])
 @require_auth
 def regenerate_week():
-    """Regenerate workouts for a specific week (snapshots old, LLM generates new)."""
+    """Regenerate (or, in maintenance mode, generate) workouts for a specific week."""
     try:
         data = request.json
         if data is None:
@@ -863,24 +863,35 @@ def regenerate_week():
         reason = data.get('reason', '')
 
         try:
-            # Get active block
             block = TrainingBlockService.get_active_block(g.db, user_id=g.current_user_id)
-            if not block:
-                return jsonify({"error": "No active training block"}), 400
-
             user_prefs = g.current_user.preferences or {}
-            result = TrainingBlockService.regenerate_week(
-                db=g.db,
-                block_id=block.id,
-                week_offset=week_offset,
-                reason=reason,
-                llm_service=llm_service,
-                user_id=g.current_user_id,
-                user_role=str(g.current_user.role),
-                preferred_model=user_prefs.get('preferred_model'),
-                user_preferences=user_prefs
-            )
-            logger.info(f"Regenerated week (offset={week_offset}) for block {block.id}")
+
+            if block:
+                result = TrainingBlockService.regenerate_week(
+                    db=g.db,
+                    block_id=block.id,
+                    week_offset=week_offset,
+                    reason=reason,
+                    llm_service=llm_service,
+                    user_id=g.current_user_id,
+                    user_role=str(g.current_user.role),
+                    preferred_model=user_prefs.get('preferred_model'),
+                    user_preferences=user_prefs
+                )
+                logger.info(f"Regenerated week (offset={week_offset}) for block {block.id}")
+            else:
+                result = TrainingBlockService.generate_maintenance_week(
+                    db=g.db,
+                    week_offset=week_offset,
+                    reason=reason,
+                    llm_service=llm_service,
+                    user_id=g.current_user_id,
+                    user_role=str(g.current_user.role),
+                    preferred_model=user_prefs.get('preferred_model'),
+                    user_preferences=user_prefs
+                )
+                logger.info(f"Generated maintenance week (offset={week_offset}) for user {g.current_user_id}")
+
             return jsonify(result)
         except ValueError as e:
             return jsonify({"error": str(e)}), 400

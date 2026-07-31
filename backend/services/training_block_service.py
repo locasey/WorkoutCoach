@@ -460,3 +460,84 @@ class TrainingBlockService:
 
         # Return updated week context
         return TrainingBlockService.get_week_context(db, week_offset=week_offset, user_id=user_id)
+
+    @staticmethod
+    def generate_maintenance_week(
+        db: Session,
+        week_offset: int,
+        reason: str,
+        llm_service,
+        user_id: uuid.UUID,
+        user_role: str = None,
+        preferred_model: str = None,
+        user_preferences: dict = None
+    ) -> Dict[str, Any]:
+        """
+        Generate (or regenerate) one week of maintenance-mode workouts — orphan rows
+        (training_block_id=None, workout_plan_id=None). No snapshot/undo (see LOC-156):
+        existing orphan workouts for the target week are deleted with no history first.
+        """
+        today = date.today()
+        target_date = today + timedelta(weeks=week_offset)
+        week_start = target_date - timedelta(days=target_date.weekday())
+        week_end = week_start + timedelta(days=6)
+        iso_week = week_start.isocalendar()[1]
+
+        existing_workouts = db.query(Workout).filter(
+            and_(
+                Workout.training_block_id.is_(None),
+                Workout.workout_plan_id.is_(None),
+                Workout.user_id == user_id,
+                Workout.scheduled_date >= week_start,
+                Workout.scheduled_date <= week_end
+            )
+        ).all()
+        for w in existing_workouts:
+            db.delete(w)
+        db.flush()
+
+        prefs = user_preferences or {}
+        experience_level = prefs.get("experience_level", "intermediate")
+        days_per_week = len(prefs.get("available_days") or []) or 4  # fallback if unset
+
+        try:
+            from services.coach_context import build_context_snapshot, render_context_prompt
+            snapshot = build_context_snapshot(db, user_id, week_offset=week_offset)
+            context_prompt = render_context_prompt(snapshot)
+        except Exception:
+            context_prompt = ""
+
+        from services.training_knowledge_base import select_relevant_principles
+        principles = select_relevant_principles(experience_level, days_per_week)
+
+        workout_data = llm_service.generate_maintenance_workouts(
+            experience_level=experience_level,
+            user_role=user_role,
+            preferred_model=preferred_model,
+            context_prompt=context_prompt,
+            principles=principles
+        )
+
+        for wd in workout_data:
+            day_num = wd.get("day")
+            if not day_num or not (1 <= day_num <= 7):
+                continue
+            scheduled_date = week_start + timedelta(days=day_num - 1)
+            db.add(Workout(
+                training_block_id=None,
+                workout_plan_id=None,
+                week=iso_week,
+                day=day_num,
+                phase=None,
+                type=wd.get("type", "easy_run"),
+                distance_km=wd.get("distance_km"),
+                duration_minutes=wd.get("duration_minutes"),
+                pace=wd.get("pace"),
+                notes=wd.get("notes"),
+                scheduled_date=scheduled_date,
+                is_completed=False,
+                user_id=user_id
+            ))
+
+        db.commit()
+        return TrainingBlockService.get_week_context(db, week_offset=week_offset, user_id=user_id)

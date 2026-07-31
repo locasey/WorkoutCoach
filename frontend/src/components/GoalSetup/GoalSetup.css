@@ -234,6 +234,39 @@
   color: var(--carbon-black);
 }
 
+/* Day picker for maintenance mode */
+.goal-setup__day-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.goal-setup__day-btn {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: white;
+  color: var(--gray-600);
+  border: 2px solid var(--gray-200);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.goal-setup__day-btn:hover {
+  border-color: var(--gray-400);
+  color: var(--carbon-black);
+}
+
+.goal-setup__day-btn--active {
+  background: var(--persian-blue);
+  color: white;
+  border-color: var(--persian-blue);
+}
+
 .goal-setup__radio-desc {
   font-size: 13px;
   color: var(--gray-500);

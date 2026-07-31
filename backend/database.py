@@ -10,7 +10,12 @@ load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/workoutcoach')
 
 # Create engine
-engine = create_engine(DATABASE_URL, echo=False)  # Set echo=True for SQL debugging
+# pool_pre_ping: test each pooled connection with a lightweight query before use and
+# transparently reconnect if it's dead — Neon (serverless Postgres) silently closes idle
+# connections, which otherwise surfaces as "SSL connection has been closed unexpectedly"
+# on the first query after any idle period.
+# pool_recycle: proactively recycle connections older than 5 minutes as a second safeguard.
+engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True, pool_recycle=300)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

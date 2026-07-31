@@ -6,6 +6,7 @@ import { X } from 'lucide-react'
 import { ModeSelect } from './ModeSelect'
 import { RaceDetails } from './RaceDetails'
 import { PhasePreview } from './PhasePreview'
+import { MaintenanceDetails } from './MaintenanceDetails'
 import { calculatePhaseMap } from '../../utils/phaseCalculator'
 import { API_ROUTES } from '../../api/routes'
 import { queryKeys } from '../../api/queryClient'
@@ -18,11 +19,14 @@ import './GoalSetup.css'
 /**
  * GoalSetup - Modal wizard for creating a new training block.
  *
- * Steps:
+ * Steps (training):
  *   1. ModeSelect - Training vs Maintenance
  *   2. RaceDetails - Event name, distance, date, experience
  *   3. PhasePreview - Visual timeline with adjustment
- *   4. Generating - Loading state during LLM generation
+ *
+ * Steps (maintenance):
+ *   1. ModeSelect - Training vs Maintenance
+ *   2. MaintenanceDetails - Available days, experience level (pre-filled from preferences)
  *
  * @param {Object} props
  * @param {boolean} props.isOpen - Whether modal is visible
@@ -32,7 +36,7 @@ export function GoalSetup({ isOpen, onClose }) {
   const queryClient = useQueryClient()
   const toast = useToast()
 
-  const [step, setStep] = useState('mode') // mode | details | preview
+  const [step, setStep] = useState('mode') // mode | details | preview | maintenance
   const [raceData, setRaceData] = useState(null)
   const [phaseMap, setPhaseMap] = useState(null)
 
@@ -49,7 +53,13 @@ export function GoalSetup({ isOpen, onClose }) {
   useEffect(() => {
     if (!isOpen) return
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && !createBlockMutation.isPending && !generateWorkoutsMutation.isPending) {
+      if (
+        e.key === 'Escape' &&
+        !createBlockMutation.isPending &&
+        !generateWorkoutsMutation.isPending &&
+        !updatePreferencesMutation.isPending &&
+        !generateMaintenanceMutation.isPending
+      ) {
         onClose()
       }
     }
@@ -80,14 +90,62 @@ export function GoalSetup({ isOpen, onClose }) {
     },
   })
 
-  const isGenerating = createBlockMutation.isPending || generateWorkoutsMutation.isPending
+  /**
+   * Maintenance mode: save preferences, then generate the first week
+   */
+  const updatePreferencesMutation = useMutation({
+    mutationFn: async (prefs) => {
+      const response = await axios.put(API_ROUTES.USER.PREFERENCES, prefs)
+      return response.data
+    },
+  })
+
+  const generateMaintenanceMutation = useMutation({
+    mutationFn: async () => {
+      const response = await axios.post(API_ROUTES.WEEK.REGENERATE, {
+        week_offset: 0,
+        reason: 'Initial maintenance week',
+      })
+      return response.data
+    },
+  })
+
+  const isGenerating =
+    createBlockMutation.isPending ||
+    generateWorkoutsMutation.isPending ||
+    updatePreferencesMutation.isPending ||
+    generateMaintenanceMutation.isPending
 
   /**
-   * Handle maintenance mode selection
+   * Maintenance mode has no goal data to collect up front — advance to the
+   * MaintenanceDetails step (days/week, experience level) instead of closing.
    */
   const handleMaintenance = useCallback(() => {
-    onClose()
-  }, [onClose])
+    setStep('maintenance')
+  }, [])
+
+  /**
+   * Handle maintenance details submission
+   * 1. PUT save available_days/experience_level to account preferences
+   * 2. POST generate the first maintenance week
+   * 3. Invalidate queries and close
+   */
+  const handleMaintenanceDetails = useCallback(async (data) => {
+    try {
+      await updatePreferencesMutation.mutateAsync(data)
+      await generateMaintenanceMutation.mutateAsync()
+
+      queryClient.invalidateQueries({ queryKey: queryKeys.week.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.profile })
+
+      toast.success('Your maintenance week is ready!')
+
+      onClose()
+    } catch (err) {
+      const msg = err?.response?.data?.error || err.message || 'Failed to generate maintenance week'
+      toast.error(msg)
+    }
+  }, [updatePreferencesMutation, generateMaintenanceMutation, queryClient, toast, onClose])
 
   /**
    * Handle race details submission
@@ -189,6 +247,13 @@ export function GoalSetup({ isOpen, onClose }) {
             onBack={() => setStep('details')}
             onGenerate={handleGenerate}
             isGenerating={isGenerating}
+          />
+        )}
+
+        {step === 'maintenance' && (
+          <MaintenanceDetails
+            onBack={() => setStep('mode')}
+            onNext={handleMaintenanceDetails}
           />
         )}
       </div>

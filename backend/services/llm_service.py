@@ -317,3 +317,57 @@ Return ONLY a JSON object: {{"workouts": [...]}}"""
             raise Exception(f"Failed to parse LLM response as JSON for {phase_name} phase: {str(e)}")
         except Exception as e:
             raise Exception(f"Failed to generate {phase_name} phase workouts: {str(e)}")
+
+    def generate_maintenance_workouts(
+        self,
+        experience_level: str = "intermediate",
+        user_role: str = None,
+        preferred_model: str = None,
+        context_prompt: str = "",
+        principles: list = None
+    ) -> list:
+        """
+        Generate one week of general-fitness "maintenance mode" workouts — no race,
+        no phase, no periodization.
+
+        Returns list of workout dicts: day, type, distance_km, duration_minutes, pace, notes
+        """
+        context_block = context_prompt.strip() + "\n\n" if context_prompt.strip() else ""
+        principles_block = ""
+        if principles:
+            principles_block = "=== EVIDENCE-BASED TRAINING PRINCIPLES ===\n" + \
+                "\n".join(f"- {p}" for p in principles) + "\n\n"
+
+        prompt = context_block + principles_block + f"""You are an expert running coach creating one week of workouts for a runner who is NOT training for a specific race — they just want to stay fit with flexible, sustainable weekly guidance, maintaining aerobic/running fitness indefinitely.
+
+Runner experience level: {experience_level}
+
+Apply the training principles above where relevant. Generate one week of workouts (Monday through Sunday). Return a JSON object with a "workouts" array.
+
+Each workout should have:
+- "day": day of week (1=Monday through 7=Sunday)
+- "type": one of "long_run", "tempo", "intervals", "easy_run", "rest", "cross_training"
+- "distance_km": distance in km (null for rest/cross_training)
+- "duration_minutes": duration in minutes (null if distance given, required for cross_training)
+- "pace": target pace description (e.g., "easy pace", "conversational", null for rest)
+- "notes": brief coaching notes for the workout
+
+Rules:
+- EXACTLY ONE workout per day, 7 workouts total (no more, no less)
+- No periodization or progressive overload — keep effort consistent and sustainable week to week
+- For a {experience_level} runner maintaining general aerobic fitness
+
+Return ONLY a JSON object: {{"workouts": [...]}}"""
+
+        model_id = self._model_for_role(user_role, preferred_model)
+        try:
+            result = self._dispatch(prompt, model_id)
+            if isinstance(result, dict) and "workouts" in result:
+                return result["workouts"]
+            if isinstance(result, list):
+                return result
+            raise ValueError("Unexpected LLM response format: expected 'workouts' array")
+        except json.JSONDecodeError as e:
+            raise Exception(f"Failed to parse LLM response as JSON for maintenance week: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Failed to generate maintenance week workouts: {str(e)}")

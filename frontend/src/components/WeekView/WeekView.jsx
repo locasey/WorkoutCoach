@@ -369,7 +369,22 @@ export function WeekView({
             </button>
           )}
         </div>
-        <WeekActions mode="maintenance" disabled />
+        <WeekActions
+          mode="maintenance"
+          onRegenerate={() => setShowRegenerate(true)}
+          isRegenerating={regenerateMutation.isPending}
+          hasWorkouts={false}
+          regenerateDisabled={false}
+          addDisabled
+        />
+        <RegenerateModal
+          isOpen={showRegenerate}
+          onClose={() => setShowRegenerate(false)}
+          onConfirm={(reason) => regenerateMutation.mutate({ weekOffset, reason })}
+          isRegenerating={regenerateMutation.isPending}
+          weekNumber={weekData?.week_number}
+          phase={weekData?.phase}
+        />
       </div>
     )
   }
@@ -479,7 +494,9 @@ export function WeekView({
         onAddWorkout={() => {
           /* Could open a date picker or add to today */
         }}
-        disabled={!weekData?.block_id}
+        hasWorkouts={hasWorkouts}
+        regenerateDisabled={false}
+        addDisabled={!weekData?.block_id}
       />
 
       {/* Regenerate Modal */}

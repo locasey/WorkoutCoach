@@ -23,7 +23,7 @@ const EXPERIENCE_LEVELS = [
  * saved preferences (unlike RaceDetails, which is always blank). No
  * event/distance/date fields — maintenance mode has an indefinite timeline.
  */
-export function MaintenanceDetails({ onBack, onNext }) {
+export function MaintenanceDetails({ onBack, onNext, isSubmitting = false }) {
   const { data: profileData } = useQuery({
     queryKey: queryKeys.user.profile,
     queryFn: async () => (await axios.get(API_ROUTES.USER.PROFILE)).data,
@@ -50,13 +50,13 @@ export function MaintenanceDetails({ onBack, onNext }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!isValid) return
+    if (!isValid || isSubmitting) return
     onNext({ available_days: availableDays, experience_level: experienceLevel })
   }
 
   return (
     <div className="goal-setup__step">
-      <button className="goal-setup__back-btn" onClick={onBack} type="button">
+      <button className="goal-setup__back-btn" onClick={onBack} type="button" disabled={isSubmitting}>
         <ChevronLeft size={20} aria-hidden />
         Back
       </button>
@@ -110,9 +110,9 @@ export function MaintenanceDetails({ onBack, onNext }) {
         <button
           type="submit"
           className="goal-setup__next-btn"
-          disabled={!isValid}
+          disabled={!isValid || isSubmitting}
         >
-          Generate My Week
+          {isSubmitting ? 'Generating your week...' : 'Generate My Week'}
         </button>
       </form>
     </div>

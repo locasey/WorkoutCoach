@@ -58,7 +58,8 @@ export function GoalSetup({ isOpen, onClose }) {
         !createBlockMutation.isPending &&
         !generateWorkoutsMutation.isPending &&
         !updatePreferencesMutation.isPending &&
-        !generateMaintenanceMutation.isPending
+        !generateMaintenanceMutation.isPending &&
+        !endActiveBlockMutation.isPending
       ) {
         onClose()
       }
@@ -110,11 +111,28 @@ export function GoalSetup({ isOpen, onClose }) {
     },
   })
 
+  /**
+   * Ending any active training block, if present. Choosing "Just Staying Fit" is an
+   * explicit mode switch — without this, an existing active block keeps routing
+   * /api/week/regenerate to the training-block path, so maintenance mode can never
+   * actually kick in. Mirrors the auto-deactivate behavior POST /api/training-block
+   * already has when creating a new block.
+   */
+  const endActiveBlockMutation = useMutation({
+    mutationFn: async (blockId) => {
+      const response = await axios.delete(API_ROUTES.TRAINING_BLOCK.DELETE(blockId), {
+        data: { completed: false },
+      })
+      return response.data
+    },
+  })
+
   const isGenerating =
     createBlockMutation.isPending ||
     generateWorkoutsMutation.isPending ||
     updatePreferencesMutation.isPending ||
-    generateMaintenanceMutation.isPending
+    generateMaintenanceMutation.isPending ||
+    endActiveBlockMutation.isPending
 
   /**
    * Maintenance mode has no goal data to collect up front — advance to the
@@ -132,11 +150,20 @@ export function GoalSetup({ isOpen, onClose }) {
    */
   const handleMaintenanceDetails = useCallback(async (data) => {
     try {
+      // Switching to maintenance mode is explicit — end any active training block first,
+      // otherwise /api/week/regenerate keeps routing to the training-block path.
+      const currentBlockRes = await axios.get(API_ROUTES.TRAINING_BLOCK.CURRENT)
+      const activeBlock = currentBlockRes.data?.block
+      if (activeBlock) {
+        await endActiveBlockMutation.mutateAsync(activeBlock.id)
+      }
+
       await updatePreferencesMutation.mutateAsync(data)
       await generateMaintenanceMutation.mutateAsync()
 
       queryClient.invalidateQueries({ queryKey: queryKeys.week.all })
       queryClient.invalidateQueries({ queryKey: queryKeys.user.profile })
+      queryClient.invalidateQueries({ queryKey: queryKeys.trainingBlock.all })
 
       toast.success('Your maintenance week is ready!')
 
@@ -145,7 +172,7 @@ export function GoalSetup({ isOpen, onClose }) {
       const msg = err?.response?.data?.error || err.message || 'Failed to generate maintenance week'
       toast.error(msg)
     }
-  }, [updatePreferencesMutation, generateMaintenanceMutation, queryClient, toast, onClose])
+  }, [endActiveBlockMutation, updatePreferencesMutation, generateMaintenanceMutation, queryClient, toast, onClose])
 
   /**
    * Handle race details submission
@@ -254,6 +281,7 @@ export function GoalSetup({ isOpen, onClose }) {
           <MaintenanceDetails
             onBack={() => setStep('mode')}
             onNext={handleMaintenanceDetails}
+            isSubmitting={isGenerating}
           />
         )}
       </div>
